@@ -1,0 +1,21 @@
+/* Tela Financeiro (somente leitura) e o bloco de valores em reais que a ficha do cliente tambem usa (js/componentes/parcela.js).
+   Cor so por var(--...) de tokens.css. A cor de situacao sempre vem junto do nome e do icone. */
+
+/* ---------------------------------------------------------------- valores em reais, um por linha */
+.resumo-fin { display: flex; flex-direction: column; gap: var(--e3); }
+.resumo-fin-linha { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: var(--e3); row-gap: 2px; }
+.resumo-fin-rotulo { display: inline-flex; align-items: center; gap: var(--e2); font-weight: 700; }
+.resumo-fin-rotulo svg { flex: none; }
+.resumo-fin-valor { font-size: var(--t-destaque); font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.resumo-fin-ajuda { grid-column: 1 / -1; color: var(--texto-2); font-size: var(--t-pequeno); }
+.resumo-fin-linha--ok .resumo-fin-rotulo, .resumo-fin-linha--ok .resumo-fin-valor { color: var(--ok); }
+.resumo-fin-linha--info .resumo-fin-rotulo, .resumo-fin-linha--info .resumo-fin-valor { color: var(--info); }
+.resumo-fin-linha--perigo .resumo-fin-rotulo, .resumo-fin-linha--perigo .resumo-fin-valor { color: var(--perigo); }
+
+/* ---------------------------------------------------------------- tela */
+.fin-resumo { margin-bottom: var(--e4); }
+.fin-nota { margin-top: var(--e3); }
+.fin-total { margin: 0 0 var(--e3); font-weight: 700; font-variant-numeric: tabular-nums; }
+.fin-total:empty { display: none; }
+.fin-mais { margin-top: var(--e3); }
+.fin-nota-final { margin-top: var(--e4); text-align: center; }

@@ -1,0 +1,130 @@
+/* Tokens de cor, espaco, forma e tipo. UNICO lugar onde existe cor escrita por extenso: o resto do CSS so usa var(--...).
+   Paleta nova (sem bronze, sem preto quente, sem off-white quente). Contraste medido por testes/test_celular_app_nucleo_estatico.py:
+   texto >= 4,5:1 e bordas de campo e botao >= 3:1, nos dois temas.
+   O tema escuro vale de dois jeitos: automatico (prefers-color-scheme) e escolhido a mao (data-tema="escuro" no <html>).
+   Os dois blocos escuros abaixo precisam ser IGUAIS (um teste confere); se mudar um, mude o outro. */
+
+:root {
+  color-scheme: light dark;
+
+  /* superficies e texto */
+  --fundo: #F5F7FA;
+  --superficie: #FFFFFF;
+  --superficie-2: #EEF2F7;
+  --linha: #D8E0EA;            /* divisoria discreta (nao delimita campo nem botao) */
+  --borda-controle: #708299;   /* contorno de campo e de botao: >= 3:1 */
+  --texto: #0F1B2D;
+  --texto-2: #4A5B70;
+
+  /* acento (verde-azulado) */
+  --acento: #0F766E;
+  --acento-hover: #115E59;
+  --acento-suave: #D5F0EC;
+  --texto-sobre-acento: #FFFFFF;
+
+  /* situacao: sempre usada com texto ou icone, nunca so a cor */
+  --perigo: #B42318;
+  --perigo-fundo: #FEF3F2;
+  --atencao: #C2410C;
+  --atencao-fundo: #FFF1E6;
+  --ok: #027A48;
+  --ok-fundo: #ECFDF3;
+  --info: #175CD3;
+  --info-fundo: #EFF8FF;
+
+  --foco: #175CD3;
+  --veu: rgba(15, 27, 45, 0.45);
+  --sombra-1: 0 1px 2px rgba(15, 27, 45, 0.06), 0 1px 3px rgba(15, 27, 45, 0.08);
+  --sombra-2: 0 8px 28px rgba(15, 27, 45, 0.18);
+  --fundo-qr: #FFFFFF;
+
+  /* espaco */
+  --e1: 4px;
+  --e2: 8px;
+  --e3: 12px;
+  --e4: 16px;
+  --e5: 24px;
+  --e6: 32px;
+  --gutter: 16px;
+
+  /* forma */
+  --raio-1: 8px;
+  --raio-2: 12px;
+  --raio-3: 16px;
+  --raio-pilula: 999px;
+  --alvo: 44px;                /* menor lado de qualquer area de toque */
+
+  /* tipografia: fonte do sistema, tamanhos em rem (acompanham o ajuste de letra do aparelho). Nada abaixo de 14 px. */
+  --fonte: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --fonte-mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
+  --t-pequeno: 0.875rem;       /* 14 px: o menor texto do aplicativo */
+  --t-corpo: 1rem;             /* 16 px */
+  --t-destaque: 1.125rem;      /* 18 px */
+  --t-titulo: 1.375rem;        /* 22 px */
+  --t-numero: 2rem;            /* 32 px */
+
+  --largura-max: 720px;
+  --altura-topo: 56px;
+  --altura-barra: 60px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    --fundo: #0B1220;
+    --superficie: #111B2D;
+    --superficie-2: #17233A;
+    --linha: #26344D;
+    --borda-controle: #60769A;
+    --texto: #E6EDF7;
+    --texto-2: #9FB0C7;
+    --acento: #2DD4BF;
+    --acento-hover: #5EEAD4;
+    --acento-suave: #0F3B3A;
+    --texto-sobre-acento: #04201E;
+    --perigo: #FDA29B;
+    --perigo-fundo: #3B1620;
+    --atencao: #FDBA74;
+    --atencao-fundo: #2A2733;
+    --ok: #6CE9A6;
+    --ok-fundo: #0F3A2A;
+    --info: #84CAFF;
+    --info-fundo: #0F2C4D;
+    --foco: #84CAFF;
+    --veu: rgba(2, 6, 14, 0.66);
+    --sombra-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --sombra-2: 0 8px 28px rgba(0, 0, 0, 0.6);
+    --fundo-qr: #FFFFFF;
+  }
+}
+
+:root[data-tema="escuro"] {
+  color-scheme: dark;
+  --fundo: #0B1220;
+  --superficie: #111B2D;
+  --superficie-2: #17233A;
+  --linha: #26344D;
+  --borda-controle: #60769A;
+  --texto: #E6EDF7;
+  --texto-2: #9FB0C7;
+  --acento: #2DD4BF;
+  --acento-hover: #5EEAD4;
+  --acento-suave: #0F3B3A;
+  --texto-sobre-acento: #04201E;
+  --perigo: #FDA29B;
+  --perigo-fundo: #3B1620;
+  --atencao: #FDBA74;
+  --atencao-fundo: #2A2733;
+  --ok: #6CE9A6;
+  --ok-fundo: #0F3A2A;
+  --info: #84CAFF;
+  --info-fundo: #0F2C4D;
+  --foco: #84CAFF;
+  --veu: rgba(2, 6, 14, 0.66);
+  --sombra-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sombra-2: 0 8px 28px rgba(0, 0, 0, 0.6);
+  --fundo-qr: #FFFFFF;
+}
+
+:root[data-tema="claro"] {
+  color-scheme: light;
+}

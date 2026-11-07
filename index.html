@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<!-- Politica de seguranca: so o proprio aplicativo roda e so o Supabase recebe pedidos. O endereco do connect-src precisa ser o de config.js. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src https://dktrdniohqngpnkjamgp.supabase.co; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<meta id="cor-claro" name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta id="cor-escuro" name="theme-color" content="#111B2D" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Gestão">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Gestão JEMJ</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/componentes.css">
+<link rel="stylesheet" href="css/telas.css">
+<link rel="stylesheet" href="css/tela-prazos.css">
+<link rel="stylesheet" href="css/tela-publicacoes.css">
+<link rel="stylesheet" href="css/tela-mais.css">
+<link rel="stylesheet" href="css/tela-clientes.css">
+<link rel="stylesheet" href="css/tela-financeiro.css">
+<link rel="stylesheet" href="css/tela-agenda.css">
+<link rel="stylesheet" href="css/tela-processos.css">
+<script src="js/inicio.js"></script>
+</head>
+<body>
+<div id="app" class="app">
+  <header id="topo" class="topo" hidden>
+    <button id="voltar" class="topo-botao" type="button" aria-label="Voltar" hidden></button>
+    <h1 id="titulo" class="topo-titulo">Gestão JEMJ</h1>
+    <button id="atualizar" class="topo-botao" type="button" aria-label="Atualizar agora"></button>
+  </header>
+  <div id="faixas" class="faixas" hidden></div>
+  <main id="conteudo" class="conteudo" tabindex="-1" aria-live="off"></main>
+  <nav id="barra" class="barra" aria-label="Seções do aplicativo" hidden></nav>
+  <div id="anuncio" class="so-leitor" role="status" aria-live="polite"></div>
+</div>
+<noscript><p class="sem-js">Este aplicativo precisa do JavaScript ligado para funcionar.</p></noscript>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

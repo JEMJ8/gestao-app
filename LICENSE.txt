@@ -1,0 +1,4 @@
+Todos os direitos reservados. / All rights reserved.
+
+Este aplicativo e de uso exclusivo do escritorio titular e de quem ele autorizar. Ver, baixar ou copiar este codigo nao da licenca para usa-lo,
+modifica-lo ou redistribui-lo. Nenhum dado de cliente esta neste repositorio: o aplicativo so mostra algo depois de um login autorizado.
