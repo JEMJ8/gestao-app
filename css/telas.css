@@ -46,25 +46,4 @@
 .cartao--nao-conferido { border-width: 2px; }
 .cartao--nao-conferido p + p { margin-top: var(--e2); }
 
-/* ---------------------------------------------------------------- Entrada (login e segundo fator) */
-.entrada-tela {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--e4);
-  max-width: 420px;
-  margin: 0 auto;
-  padding: var(--e5) 0 var(--e4);
-}
-.entrada-painel { width: 100%; display: flex; flex-direction: column; gap: var(--e4); padding: var(--e5) var(--e4); background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio-3); box-shadow: var(--sombra-1); }
-.entrada-marca { display: inline-flex; align-items: center; justify-content: center; align-self: center; width: 56px; height: 56px; border-radius: var(--raio-pilula); background: var(--acento-suave); color: var(--acento); }
-.entrada-titulo { font-size: var(--t-titulo); font-weight: 800; line-height: 1.2; text-align: center; }
-.entrada-painel > p { text-align: center; }
-.entrada-formulario { display: flex; flex-direction: column; gap: var(--e4); }
-.entrada-formulario .campo + .campo { margin-top: 0; }
-.entrada-passos { margin: 0; padding-left: var(--e5); display: flex; flex-direction: column; gap: var(--e2); }
-.entrada-passos li { list-style: decimal; }
-.entrada-qr-caixa { align-self: center; padding: var(--e3); background: var(--fundo-qr); border: 1px solid var(--linha); border-radius: var(--raio-2); }
-.entrada-qr { display: block; width: 200px; height: 200px; max-width: 100%; background: var(--fundo-qr); }
-.entrada-chave { padding: var(--e3); background: var(--superficie-2); border: 1px solid var(--linha); border-radius: var(--raio-2); font-family: var(--fonte-mono); font-size: var(--t-destaque); letter-spacing: 0.05em; text-align: center; user-select: all; }
-.entrada-versao { text-align: center; }
+/* A tela de entrada (login e segundo fator) tem o proprio arquivo: css/tela-entrada.css. */

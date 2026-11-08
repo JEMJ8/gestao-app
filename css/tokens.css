@@ -38,6 +38,20 @@
   --sombra-2: 0 8px 28px rgba(15, 27, 45, 0.18);
   --fundo-qr: #FFFFFF;
 
+  /* tela de entrada: o topo e SEMPRE azul-marinho, no tema claro e no escuro, e o simbolo do escritorio aparece em verde-azulado.
+     Ficam so aqui (nao se repetem nos blocos escuros) porque nao mudam com o tema. Nenhum tom quente. */
+  --hero-1: #0F1B2D;           /* o mesmo azul-marinho da barra escura do sistema */
+  --hero-2: #0B3A44;           /* azul-petroleo escuro */
+  --hero-marca: #2DD4BF;       /* simbolo do escritorio */
+  --hero-texto: #F4F8FC;
+  --hero-texto-2: #B4C2D6;
+  --hero-vidro: rgba(255, 255, 255, 0.08);
+  --hero-vidro-borda: rgba(255, 255, 255, 0.18);
+  --hero-marca-fundo: rgba(255, 255, 255, 0.045);
+  --hero-fundo: linear-gradient(165deg, var(--hero-1) 0%, var(--hero-2) 100%);
+  --hero-brilho: radial-gradient(60% 55% at 85% 0%, rgba(45, 212, 191, 0.30) 0%, rgba(45, 212, 191, 0) 70%);
+  --acento-brilho: 0 6px 18px rgba(15, 118, 110, 0.30);
+
   /* espaco */
   --e1: 4px;
   --e2: 8px;

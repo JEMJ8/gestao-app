@@ -19,6 +19,7 @@ body {
   font-size: var(--t-corpo);
   line-height: 1.45;
   overflow-x: hidden;
+  word-break: break-word;       /* o mesmo para navegador que nao conhece overflow-wrap: anywhere */
   overflow-wrap: anywhere;      /* numero de processo e link comprido nunca estouram a tela */
   -webkit-tap-highlight-color: transparent;
 }
@@ -33,7 +34,12 @@ a:hover { color: var(--acento-hover); }
 code, kbd { font-family: var(--fonte-mono); }
 [hidden] { display: none !important; }
 
-/* foco sempre visivel (teclado e leitor de tela) */
+/* foco sempre visivel (teclado e leitor de tela). As duas primeiras regras cobrem navegador que nao conhece :focus-visible. */
+:focus {
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
+}
+:focus:not(:focus-visible) { outline: none; }
 :focus-visible {
   outline: 3px solid var(--foco);
   outline-offset: 2px;
@@ -52,6 +58,11 @@ main:focus { outline: none; }
 }
 
 .sem-js { padding: var(--e5); font-size: var(--t-destaque); }
+
+/* Aviso de quando o aplicativo ou a folha de cores nao chegou (js/inicio.js e js/app.js): nao pode depender de nenhuma variavel de cor. */
+.aviso-visual { padding: 24px; font-family: system-ui, sans-serif; font-size: 1rem; line-height: 1.45; background: Canvas; color: CanvasText; }
+.aviso-visual p { margin: 0 0 16px; }
+.aviso-visual button { min-height: 44px; padding: 0 20px; font: inherit; }
 
 /* ---------------------------------------------------------------- casca */
 .app {

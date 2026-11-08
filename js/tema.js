@@ -5,6 +5,8 @@ const CHAVE = 'gestao.tema';
 // Cores da barra do navegador: iguais a --superficie de css/tokens.css (um teste confere).
 export const COR_DA_BARRA_CLARA = '#FFFFFF';
 export const COR_DA_BARRA_ESCURA = '#111B2D';
+// Na tela de entrada o topo e azul-marinho nos dois temas (--hero-1 de css/tokens.css, um teste confere): a barra do navegador acompanha.
+export const COR_DA_BARRA_DA_ENTRADA = '#0F1B2D';
 
 export const OPCOES_DE_TEMA = [
   { valor: 'auto', rotulo: 'Automático', ajuda: 'Acompanha o aparelho' },
@@ -30,6 +32,18 @@ export function aplicarTema(valor = preferenciaDeTema()) {
   const escuro = document.getElementById('cor-escuro');
   if (claro) claro.setAttribute('content', valor === 'escuro' ? COR_DA_BARRA_ESCURA : COR_DA_BARRA_CLARA);
   if (escuro) escuro.setAttribute('content', valor === 'claro' ? COR_DA_BARRA_CLARA : COR_DA_BARRA_ESCURA);
+}
+
+/** Liga ou desliga a cor da barra do navegador da tela de entrada (desligar devolve a cor do tema escolhido). */
+export function barraDaEntrada(ativa) {
+  if (!ativa) {
+    aplicarTema();
+    return;
+  }
+  for (const id of ['cor-claro', 'cor-escuro']) {
+    const meta = document.getElementById(id);
+    if (meta) meta.setAttribute('content', COR_DA_BARRA_DA_ENTRADA);
+  }
 }
 
 export function definirTema(valor) {

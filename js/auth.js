@@ -18,9 +18,15 @@ const CHAVE_QUE_SOBREVIVE = 'gestao.tema';   // preferencia de aparencia: nao e 
 const MARGEM_DE_RENOVACAO_S = 90;
 const NOME_DO_FATOR = 'celular';
 const EMISSOR = 'Gestão JEMJ';
+// O cadastro do autenticador que ainda nao foi confirmado fica guardado junto com a sessao (so de senha) por pouco tempo: quem vai ao
+// aplicativo autenticador e volta pode encontrar a pagina recarregada, e sem isso o segredo que ja foi cadastrado la seria perdido.
+const VALIDADE_DO_CADASTRO_S = 15 * 60;
 
 let sessao = lerSessaoGuardada();
 let fatorEmCadastro = null;
+// Sobe a cada senha nova e a cada "Usar outra conta": o que estava em andamento (codigo sendo conferido, autenticador sendo criado) percebe
+// que a pessoa desistiu e para, em vez de gravar a sessao da conta que ela acabou de dispensar.
+let geracao = 0;
 let renovando = null;
 let temporizador = null;
 const ouvintes = new Set();
@@ -64,7 +70,30 @@ export function lerToken(token) {
   }
 }
 
-function aoReceberSessao(dados) {
+// Prazos da entrada contam pelo relogio do aparelho nos DOIS lados (gravar e conferir): o desvio do relogio do servidor so existe em memoria e
+// volta a zero quando a pagina recarrega, entao misturar os dois relogios fazia o cadastro "vencer" ou "nascer no futuro".
+function relogioLocalEmSegundos() {
+  return Math.floor(Date.now() / 1000);
+}
+
+function recente(desde) {
+  const idade = relogioLocalEmSegundos() - desde;
+  return Number.isFinite(desde) && idade > -3 * 60 * 60 && idade < VALIDADE_DO_CADASTRO_S;
+}
+
+function cadastroValido(c) {
+  return Boolean(c && typeof c.id === 'string' && typeof c.segredo === 'string' && c.segredo && recente(c.em));
+}
+
+function cancelado(minhaGeracao) {
+  if (minhaGeracao !== geracao) throw new ErroApi('cancelado', { codigo: 'cancelado' });
+}
+
+/**
+ * `manterCadastro` so e falso quando a sessao muda de mao (senha nova ou codigo confirmado): a renovacao do token mantem o cadastro pendente.
+ * `senhaAgora` marca o instante em que a senha foi aceita (a entrada so e retomada depois de recarregar dentro do prazo).
+ */
+function aoReceberSessao(dados, { manterCadastro = true, senhaAgora = false } = {}) {
   const corpo = lerToken(dados.access_token);
   const usuario = dados.user || {};
   sessao = {
@@ -74,6 +103,8 @@ function aoReceberSessao(dados) {
     user_id: usuario.id || (sessao && sessao.user_id) || corpo.sub || null,
     email: usuario.email || (sessao && sessao.email) || corpo.email || null,
     fatores: Array.isArray(usuario.factors) ? usuario.factors : (sessao && sessao.fatores) || [],
+    cadastro: manterCadastro && sessao && cadastroValido(sessao.cadastro) ? sessao.cadastro : null,
+    senha_em: senhaAgora ? relogioLocalEmSegundos() : (sessao && sessao.senha_em) || null,
   };
   guardarSessao();
   agendarRenovacao();
@@ -129,19 +160,48 @@ const FATOR_TOTP = (f) => f && f.factor_type === 'totp';
 /** Passo 1. Devolve { passo: 'codigo' } (ja tem autenticador) ou { passo: 'cadastro' } (primeiro acesso: precisa cadastrar o autenticador). */
 export async function entrar(email, senha) {
   fatorEmCadastro = null;
+  geracao += 1;
+  const minhaGeracao = geracao;
   const r = await chamarAuth('POST', '/token?grant_type=password', { corpo: { email: String(email).trim(), password: senha } });
-  aoReceberSessao(r.dados);
+  cancelado(minhaGeracao);
+  aoReceberSessao(r.dados, { manterCadastro: false, senhaAgora: true });
   const verificado = sessao.fatores.find((f) => FATOR_TOTP(f) && f.status === 'verified');
   return { passo: verificado ? 'codigo' : 'cadastro' };
 }
 
+/**
+ * Pagina recarregada no meio da entrada (a pessoa foi ao aplicativo autenticador e voltou, ou o navegador descartou a aba): devolve o passo em
+ * que ela estava, sem pedir a senha de novo, ou null se nao ha o que retomar. Nao fala com a nuvem: so le o que a sessao guardou.
+ */
+export function retomarEntrada() {
+  if (!sessao || nivelAtual() === 'aal2') return null;
+  if (sessao.fatores.find((f) => FATOR_TOTP(f) && f.status === 'verified')) {
+    if (recente(sessao.senha_em)) return { passo: 'codigo' };
+  } else if (cadastroValido(sessao.cadastro)) {
+    const c = sessao.cadastro;
+    fatorEmCadastro = c.id;
+    return { passo: 'cadastro', cadastro: { qrSvg: String(c.qrSvg || ''), segredo: c.segredo, uri: String(c.uri || '') } };
+  }
+  // passou do prazo (ou nao ha o que retomar): apaga de verdade, inclusive o segredo pendente, em vez de so ignorar
+  perder('abandonada');
+  return null;
+}
+
 /** Primeiro acesso: pede o segredo do autenticador. Devolve { qrSvg (texto do SVG), segredo, uri }. */
 export async function iniciarCadastro() {
+  const minhaGeracao = geracao;
   const token = await tokenParaUso();
-  // sobra de uma tentativa anterior que ficou pela metade: sai do caminho para o nome "celular" nao dar conflito
+  cancelado(minhaGeracao);
+  // sobra de uma tentativa anterior que ficou pela metade: sai do caminho para o nome "celular" nao dar conflito.
+  // `substituiu` avisa a tela: a pessoa pode ter uma entrada velha no aplicativo autenticador que nao vale mais.
+  let substituiu = false;
   for (const f of sessao.fatores.filter((x) => FATOR_TOTP(x) && x.status !== 'verified')) {
-    try { await chamarAuth('DELETE', `/factors/${encodeURIComponent(f.id)}`, { token }); } catch { /* segue: o cadastro abaixo diz se deu problema */ }
+    try {
+      await chamarAuth('DELETE', `/factors/${encodeURIComponent(f.id)}`, { token });
+      substituiu = true;
+    } catch { /* segue: o cadastro abaixo diz se deu problema */ }
   }
+  cancelado(minhaGeracao);
   let r;
   try {
     r = await chamarAuth('POST', '/factors', { token, corpo: { factor_type: 'totp', friendly_name: NOME_DO_FATOR, issuer: EMISSOR } });
@@ -149,9 +209,13 @@ export async function iniciarCadastro() {
     if (!(erro instanceof ErroApi) || erro.status !== 422) throw erro;
     r = await chamarAuth('POST', '/factors', { token, corpo: { factor_type: 'totp', friendly_name: `${NOME_DO_FATOR} ${Date.now().toString(36)}`, issuer: EMISSOR } });
   }
+  cancelado(minhaGeracao);
   fatorEmCadastro = r.dados.id;
   const totp = r.dados.totp || {};
-  return { qrSvg: String(totp.qr_code || ''), segredo: String(totp.secret || ''), uri: String(totp.uri || '') };
+  const dadosDoFator = { qrSvg: String(totp.qr_code || ''), segredo: String(totp.secret || ''), uri: String(totp.uri || '') };
+  sessao.cadastro = { id: fatorEmCadastro, ...dadosDoFator, em: relogioLocalEmSegundos() };
+  guardarSessao();
+  return { ...dadosDoFator, substituiu };
 }
 
 /** Passo 2: confere o codigo de 6 digitos (cadastro ou entrada). Termina com sessao aal2 guardada. Levanta ErroApi se o codigo nao confere. */
@@ -161,12 +225,39 @@ export async function verificarCodigo(codigo) {
   const verificado = sessao && sessao.fatores.find((f) => FATOR_TOTP(f) && f.status === 'verified');
   const fatorId = fatorEmCadastro || (verificado && verificado.id);
   if (!fatorId) throw new ErroApi('sem fator', { status: 400, codigo: 'sem_fator' });
-  const token = await tokenParaUso();
+  const minhaGeracao = geracao;
+  // 401 ou 403 (token vencido, sessao apagada na nuvem): renova UMA vez e tenta de novo; se ainda assim a nuvem nao reconhece a sessao, ela acabou
+  const comRenovacao = async (fazer) => {
+    const token = await tokenParaUso();
+    try {
+      return await fazer(token);
+    } catch (erro) {
+      if (!(erro instanceof ErroApi) || erro.rede || (erro.status !== 401 && erro.status !== 403)) throw erro;
+    }
+    cancelado(minhaGeracao);
+    await renovar();
+    cancelado(minhaGeracao);
+    try {
+      return await fazer(sessao.access_token);
+    } catch (erro) {
+      if (erro instanceof ErroApi && !erro.rede && (erro.status === 401 || erro.status === 403)) perder('sessao-acabou');
+      throw erro;
+    }
+  };
   // um desafio novo a cada tentativa: nao depende de o anterior ainda valer
-  const desafio = await chamarAuth('POST', `/factors/${encodeURIComponent(fatorId)}/challenge`, { token, corpo: {} });
-  const r = await chamarAuth('POST', `/factors/${encodeURIComponent(fatorId)}/verify`, { token, corpo: { challenge_id: desafio.dados.id, code: limpo } });
+  let desafio;
+  try {
+    desafio = await comRenovacao((token) => chamarAuth('POST', `/factors/${encodeURIComponent(fatorId)}/challenge`, { token, corpo: {} }));
+  } catch (erro) {
+    // a nuvem apaga sozinha o autenticador que ficou muito tempo sem ser confirmado: a tela gera outro (ou manda entrar de novo) e explica (entrada.js)
+    if (erro instanceof ErroApi && erro.status === 404) throw new ErroApi('fator sumiu', { status: 404, codigo: 'fator_sumiu' });
+    throw erro;
+  }
+  cancelado(minhaGeracao);
+  const r = await comRenovacao((token) => chamarAuth('POST', `/factors/${encodeURIComponent(fatorId)}/verify`, { token, corpo: { challenge_id: desafio.dados.id, code: limpo } }));
+  cancelado(minhaGeracao);
   fatorEmCadastro = null;
-  aoReceberSessao(r.dados);
+  aoReceberSessao(r.dados, { manterCadastro: false });
   if (nivelAtual() !== 'aal2') {
     perder('sem-aal2');
     throw new ErroApi('sessao sem segundo fator', { status: 401, codigo: 'sem_aal2' });
@@ -177,8 +268,9 @@ export async function verificarCodigo(codigo) {
 export function mensagemDeEntrada(erro, passo) {
   if (!(erro instanceof ErroApi)) return 'Não foi possível entrar agora. Tente de novo em instantes.';
   if (erro.rede) return 'Sem conexão com a internet. Confira o sinal e tente de novo.';
-  if (erro.status === 429) return 'Muitas tentativas seguidas. Espere um minuto e tente de novo.';
+  if (erro.status === 429) return 'Muitas tentativas seguidas. Espere alguns minutos e tente de novo.';
   if (passo === 'senha' && (erro.status === 400 || erro.status === 401 || erro.status === 422)) return 'E-mail ou senha incorretos.';
+  if (passo === 'cadastro' && (erro.status === 400 || erro.status === 422)) return 'Código incorreto. Confira se é o código da entrada "Gestão JEMJ" no autenticador, se a chave foi colada inteira e se a hora do celular está certa.';
   if (passo !== 'senha' && (erro.status === 400 || erro.status === 422)) return 'Código incorreto, confira a hora do celular.';
   return 'Não foi possível entrar agora. Tente de novo em instantes.';
 }
@@ -254,7 +346,11 @@ export async function comSessao(fn) {
 
 /** Desiste do login no meio (aperta "Usar outra conta"): larga a sessao so de senha, sem apagar o cache de dados. */
 export function cancelarEntrada() {
+  geracao += 1;
+  const token = sessao && sessao.access_token;
   perder('cancelou');
+  // melhor esforco: a nuvem tambem esquece a sessao so de senha (sair() faz o mesmo para a sessao completa)
+  if (token) chamarAuth('POST', '/logout?scope=local', { token }).catch(() => {});
 }
 
 // ---------------------------------------------------------------- sair

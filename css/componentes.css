@@ -18,6 +18,8 @@
   line-height: 1.2;
   text-align: center;
   text-decoration: none;
+  -webkit-appearance: none;
+  appearance: none;
 }
 .botao:hover { background: var(--superficie-2); color: var(--texto); }
 .botao--primario { background: var(--acento); border-color: var(--acento); color: var(--texto-sobre-acento); }
@@ -179,9 +181,20 @@ button.linha-corpo { width: 100%; background: transparent; border: 0; text-align
   border-radius: var(--raio-2);
   color: var(--texto);
   font-size: 1rem;              /* 16 px: o iPhone nao da zoom ao focar */
+  font-size: max(16px, 1rem);   /* e nao deixa o texto menor que 16 px mesmo com a letra do aparelho reduzida */
   line-height: 1.3;
+  -webkit-appearance: none;     /* o iPhone desenha uma sombra interna nos campos se a aparencia nativa ficar ligada */
+  appearance: none;
+  box-shadow: none;
 }
 .entrada:focus-visible { outline-offset: 0; border-color: var(--foco); }
+/* preenchimento automatico do navegador (amarelo ou azul): o texto e o fundo continuam legiveis nos dois temas */
+.entrada:-webkit-autofill, .entrada:-webkit-autofill:hover, .entrada:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--texto);
+  caret-color: var(--texto);
+  box-shadow: 0 0 0 1000px var(--superficie) inset;
+  transition: background-color 9999s ease-out;
+}
 .entrada--codigo { font-family: var(--fonte-mono); font-size: 1.75rem; letter-spacing: 0.35em; text-align: center; }
 textarea.entrada { min-height: 96px; resize: vertical; }
 .entrada-com-botao { position: relative; display: flex; }
