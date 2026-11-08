@@ -5,7 +5,7 @@
 //    e guarda no IndexedDB, para o aplicativo abrir na hora e funcionar sem internet;
 //  - mantem tudo em memoria: `obter('prazo')` devolve a lista na hora (sincrono, depois de `iniciar()`);
 //  - sabe quando o COMPUTADOR sincronizou pela ultima vez (tabela estado_nuvem) e quando ESTE aparelho baixou (estado());
-//  - manda comandos ao computador (enviarComando) e acompanha a resposta (comandosDoAlvo);
+//  - manda comandos ao computador (enviarComando: situacao, conferir, editar e excluir prazo) e acompanha a resposta (comandosDoAlvo);
 //  - traz o texto de uma publicacao so quando ela e aberta (carregarTextoPublicacao);
 //  - oferece as juncoes que toda tela precisa (cliente do processo, partes, prazos de um processo, ordenacao).
 //
@@ -18,7 +18,8 @@ import * as armazenamento from './idb.js';
 import { epochDe, hojeEmCuiaba, somarDias, dataDoMomento, definirDesvioDoRelogio, agoraCerto } from './datas.js';
 import {
   STATUS_ABERTOS, STATUS_ENCERRADOS, STATUS_DO_COMANDO, ordenarPorDataFatal, prazoAberto, prazoNaoConferido, situacaoDoPrazo,
-  eventoPendente, publicacaoNova,
+  eventoPendente, publicacaoNova, CAMPOS_EDITAVEIS, LIMITE_DA_NOTA_DE_EDICAO, LIMITE_DA_NOTA_DE_EXCLUSAO, LIMITE_DE_BYTES_DO_PEDIDO,
+  FRASE_NAO_EXCLUI_NAO_CUMPRIDO, analisarEdicaoDoPrazo, dataDoPrazoValida,
 } from './dominio.js';
 
 const TABELAS = armazenamento.TABELAS_DO_ESPELHO;
@@ -443,12 +444,64 @@ auth.aoSair(esquecerTudo);
 /** Erro de um pedido mal feito, ANTES de sair do aparelho. `.message` ja e uma frase simples para mostrar. */
 export class ErroDeComando extends Error {}
 
+/** A anotacao (opcional) de um pedido de editar ou excluir: texto de ate `limite` letras. Devolve o texto sem espacos nas pontas ('' se nao ha). */
+function anotacaoDoPedido(d, limite) {
+  if (d.nota === undefined || d.nota === null) return '';
+  if (typeof d.nota !== 'string') throw new ErroDeComando('A anotação precisa ser um texto.');
+  const nota = d.nota.trim();
+  if (nota.length > limite) throw new ErroDeComando(`A anotação pode ter até ${limite} letras.`);
+  return nota;
+}
+
+/** A nuvem recusa dados grandes (4000 bytes): melhor dizer isso aqui, em frase simples, do que deixar o pedido falhar na rede. */
+function conferirTamanhoDoPedido(saida) {
+  if (new TextEncoder().encode(JSON.stringify(saida)).length > LIMITE_DE_BYTES_DO_PEDIDO) {
+    throw new ErroDeComando('O pedido ficou grande demais. Escreva menos na observação ou na anotação.');
+  }
+  return saida;
+}
+
+/** prazo_editar: pelo menos um de ato, data_fatal, data_interna e observacao (mais nota). As mesmas regras do computador (app/nuvem/comandos.py). */
+function validarEdicao(alvoId, d) {
+  const permitidas = new Set([...CAMPOS_EDITAVEIS, 'nota']);
+  if (Object.keys(d).some((k) => !permitidas.has(k))) throw new ErroDeComando('O pedido traz dados que o celular não pode mandar.');
+  const campos = Object.fromEntries(CAMPOS_EDITAVEIS.filter((c) => Object.prototype.hasOwnProperty.call(d, c)).map((c) => [c, d[c]]));
+  if (!Object.keys(campos).length) throw new ErroDeComando('Escolha o que mudar no prazo.');
+  const { erros, tudo } = analisarEdicaoDoPrazo(campos, linha('prazo', alvoId), { conferirTodos: true });
+  const primeiro = CAMPOS_EDITAVEIS.find((c) => erros[c]);
+  if (primeiro) throw new ErroDeComando(erros[primeiro]);
+  const nota = anotacaoDoPedido(d, LIMITE_DA_NOTA_DE_EDICAO);
+  return conferirTamanhoDoPedido({ ...tudo, ...(nota ? { nota } : {}) });
+}
+
+/** prazo_excluir: so a anotacao. Prazo "Nao cumprido" nao sai (o registro fica para controle). */
+function validarExclusao(alvoId, d) {
+  if (Object.keys(d).some((k) => k !== 'nota')) throw new ErroDeComando('O pedido traz dados que o celular não pode mandar.');
+  const nota = anotacaoDoPedido(d, LIMITE_DA_NOTA_DE_EXCLUSAO);
+  const prazo = linha('prazo', alvoId);
+  if (prazo && prazo.status === 'perdido') throw new ErroDeComando(FRASE_NAO_EXCLUI_NAO_CUMPRIDO);
+  return nota ? { nota } : {};
+}
+
 function validarComando(tipo, alvoId, dados) {
   if (typeof alvoId !== 'string' || !/^[A-Za-z0-9_-]{1,40}$/.test(alvoId)) throw new ErroDeComando('Não foi possível identificar o prazo.');
-  const d = dados && typeof dados === 'object' ? dados : {};
+  const d = dados && typeof dados === 'object' && !Array.isArray(dados) ? dados : {};
+  if (tipo === 'prazo_editar') return validarEdicao(alvoId, d);
+  if (tipo === 'prazo_excluir') return validarExclusao(alvoId, d);
   const nota = typeof d.nota === 'string' ? d.nota.trim() : '';
   if (nota.length > LIMITE_DA_NOTA) throw new ErroDeComando(`A anotação pode ter até ${LIMITE_DA_NOTA} letras.`);
-  if (tipo === 'prazo_conferir') return { ...(nota ? { nota } : {}) };
+  if (tipo === 'prazo_conferir') {
+    // data_vista: a data fatal que a pessoa viu ao confirmar. Sem ela o computador nao sabe qual data foi conferida; a tela sempre a manda.
+    // (Chamada sem `data_vista` usa a data que o espelho tem agora.) O computador recusa se a data dele ja for outra.
+    const prazo = linha('prazo', alvoId);
+    const vista = d.data_vista !== undefined && d.data_vista !== null ? d.data_vista : (prazo ? prazo.data_fatal : null);
+    let dataVista = null;
+    if (vista !== null && vista !== undefined && vista !== '') {
+      dataVista = typeof vista === 'string' ? vista.trim() : '';
+      if (!dataDoPrazoValida(dataVista)) throw new ErroDeComando('O celular não consegue ler a data fatal deste prazo. Veja o prazo no computador.');
+    }
+    return { ...(dataVista ? { data_vista: dataVista } : {}), ...(nota ? { nota } : {}) };
+  }
   if (tipo !== 'prazo_status') throw new ErroDeComando('Pedido desconhecido.');
   if (!STATUS_DO_COMANDO.includes(d.status)) throw new ErroDeComando('Situação desconhecida.');
   const prazo = linha('prazo', alvoId);
@@ -470,7 +523,12 @@ function validarComando(tipo, alvoId, dados) {
  * reflete depois. Tipos (dados):
  *   'prazo_status'   { status: aberto|em_producao|protocolado|cumprido|perdido, nota?, protocolado_em? }
  *                    "perdido" (Nao cumprido) exige `nota` com o motivo; reabrir um prazo encerrado exige `nota`.
- *   'prazo_conferir' { nota? }   o advogado conferiu a data fatal. O celular NUNCA muda a data fatal.
+ *   'prazo_conferir' { data_vista?, nota? }   o advogado conferiu a data fatal. `data_vista` (AAAA-MM-DD) e a data que ele tinha na tela ao
+ *                    confirmar: o computador so confere se a data fatal dele ainda for essa (se um pedido de edicao a mudou antes, recusa).
+ *   'prazo_editar'   { ato?, data_fatal?, data_interna?, observacao?, nota? }   pelo menos um dos quatro primeiros (data interna e observacao
+ *                    vazias ou nulas = tirar). So o que mudou deve ir. O celular PEDE a mudanca (inclusive da data fatal); quem aplica e o
+ *                    computador, que zera a conferencia: o prazo volta a "nao conferido" ate o advogado conferir de novo.
+ *   'prazo_excluir'  { nota? }   tira o prazo de tudo (o registro continua guardado no sistema; nao ha como desfazer pela tela). Prazo "Nao cumprido" nao sai.
  * Devolve o comando guardado { id, tipo, alvo_id, dados, enviado_em, estado: 'enviado', ... }.
  * Levanta ErroDeComando (pedido mal feito) ou ErroApi (sem internet, sem permissao...). Nao ha fila offline de proposito.
  */

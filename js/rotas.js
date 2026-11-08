@@ -154,9 +154,10 @@ export function voltar() {
 /**
  * Registra uma camada aberta (folha inferior) no historico, para o Voltar do aparelho fecha-la sem sair da tela.
  * `fechar()` e chamada quando a pessoa aperta Voltar. Devolve `liberar()`, que a camada chama quando ela mesma se fecha.
+ * `antesDeVoltar()` (opcional) e chamada primeiro: se devolver true, a camada FICA aberta (ela mesma pergunta e se fecha se a pessoa quiser).
  */
-export function empilharCamada(fechar) {
-  const item = { fechar, ativa: true };
+export function empilharCamada(fechar, { antesDeVoltar = null } = {}) {
+  const item = { fechar, ativa: true, antesDeVoltar };
   camadas.push(item);
   posicao += 1;
   window.history.pushState({ n: posicao, camada: true }, '');
@@ -192,8 +193,16 @@ function aoVoltarPeloHistorico() {
     }
     return;
   }
-  const topo = camadas.pop();
+  const topo = camadas[camadas.length - 1];
   if (topo) {
+    if (topo.antesDeVoltar && topo.antesDeVoltar()) {
+      // A camada tem algo a perder (um formulario preenchido) e vai perguntar antes de sair: o Voltar ja gastou a entrada do historico,
+      // entao poe outra no lugar. Se a pessoa descartar, a camada se fecha e devolve essa entrada pelo caminho de sempre.
+      posicao += 1;
+      window.history.pushState({ n: posicao, camada: true }, '');
+      return;
+    }
+    camadas.pop();
     topo.ativa = false;
     topo.fechar();
     return;

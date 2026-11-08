@@ -5,7 +5,7 @@
 // A cada publicacao: mude VERSAO aqui E em js/versao.js (um teste confere que sao iguais) e confira a lista ARQUIVOS
 // (um teste confere que ela tem todos os arquivos da pasta).
 
-const VERSAO = '1.1.1';
+const VERSAO = '1.2.0';
 const PREFIXO = 'gestao-jemj-casca-';
 const CACHE = `${PREFIXO}${VERSAO}`;
 
@@ -57,6 +57,7 @@ const ARQUIVOS = [
   'js/componentes/contato.js',
   'js/componentes/confirmacao.js',
   'js/componentes/consultas-lista.js',
+  'js/componentes/edicao-do-prazo.js',
   'js/componentes/filtros-de-lista.js',
   'js/componentes/memoria-calculo.js',
   'js/componentes/texto-da-publicacao.js',

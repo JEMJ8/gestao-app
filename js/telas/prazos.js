@@ -3,9 +3,10 @@
 //
 // Convencao de ligacao vinda de Hoje: #/prazos?situacao=vencido|hoje|proximo|futuro|encerrado|atencao e #/prazos?nao_conferidos=1.
 //
-// O que esta tela NUNCA faz: mudar a data fatal, conferir prazo por conta propria, mostrar a situacao nova antes de o computador aplicar.
-// Os botoes do detalhe so PEDEM (comando prazo_status ou prazo_conferir); o pedido aparece como "Enviado, aguardando o computador" ate o
-// computador responder e o espelho mudar.
+// O que esta tela NUNCA faz: gravar a data fatal ou qualquer dado do prazo por conta propria, conferir prazo por conta propria, mostrar a situacao
+// ou os dados novos antes de o computador aplicar. Os botoes do detalhe so PEDEM (comandos prazo_status, prazo_conferir, prazo_editar e
+// prazo_excluir); o pedido aparece como "Enviado, aguardando o computador" ate o computador responder e o espelho mudar. Quem aplica e o
+// computador: se o pedido mudar a data fatal, ele zera a conferencia e o prazo volta a aparecer como "Nao conferido".
 
 import { registrar, href } from '../rotas.js';
 import * as dados from '../dados.js';
@@ -13,13 +14,16 @@ import { h, preencher, anunciar } from '../ui.js';
 import { icone } from '../icones.js';
 import { dataBR, dataComDia, dataExtenso, hojeEmCuiaba, momentoEmCuiaba, textoDeDias } from '../datas.js';
 import { plural } from '../formato.js';
-import { criadoAutomaticamente, prazoAberto, prazoNaoConferido, rotuloDaOrigem, situacaoDoPrazo, ROTULO_STATUS } from '../dominio.js';
+import {
+  criadoAutomaticamente, LIMITE_DA_NOTA_DE_EXCLUSAO, prazoAberto, prazoNaoConferido, rotuloDaOrigem, situacaoDoPrazo, ROTULO_STATUS,
+} from '../dominio.js';
 import { cartao } from '../componentes/cartao.js';
 import { lista, linhaDePrazo, linhaDePrazoComProblema, numeroDoProcesso } from '../componentes/linha.js';
 import { selo, seloConferido, seloCriadoPeloSistema, seloDeSituacao, seloDeStatus, seloNaoConferido } from '../componentes/selo.js';
 import { vazio } from '../componentes/vazio.js';
 import { confirmar } from '../componentes/confirmacao.js';
 import { blocoDeComandos } from '../componentes/comando.js';
+import { abrirEdicaoDoPrazo } from '../componentes/edicao-do-prazo.js';
 import { campoDeBusca, grupoDeChips, semDadosAinda } from '../componentes/filtros-de-lista.js';
 import {
   achaNaBusca, contagensDePrazo, ehFiltroExtra, filtroDaConsulta, opcoesDeFiltroDePrazo, paginar, prazosDoFiltro, textoDeBuscaDoPrazo,
@@ -214,7 +218,10 @@ const AJUDA_DA_NOTA = 'Este texto fica registrado no histórico do prazo, junto 
 const ACOES = {
   conferir: {
     tipo: 'prazo_conferir', estilo: 'primaria', icone: 'escudo', titulo: 'Conferi a data fatal', ajuda: 'Registra que você conferiu a contagem e a data.',
-    dados: (nota) => ({ ...(nota ? { nota } : {}) }),
+    // data_vista: a data que a pessoa tinha na tela ao confirmar. O computador so confere se a data fatal dele ainda for essa: se um pedido de
+    // edicao mudou a data antes, o pedido de conferir e recusado (a pessoa nunca viu a data nova).
+    dados: (nota, prazo) => ({ ...(prazo && prazo.data_fatal ? { data_vista: prazo.data_fatal } : {}), ...(nota ? { nota } : {}) }),
+    ajudaSeHaEdicaoPendente: 'Há um pedido de mudança dos dados enviado para este prazo. Espere o computador aplicar e confira a data nova.',
     confirmacao: (prazo) => ({
       titulo: 'Você conferiu a data fatal?',
       texto: `O computador vai registrar que você conferiu a data fatal de ${dataComDia(prazo.data_fatal)}. Só confirme se você mesmo conferiu a contagem, a publicação e o calendário.`,
@@ -255,6 +262,25 @@ const ACOES = {
       rotuloConfirmar: 'Reabrir o prazo', nota: { rotulo: 'Motivo', obrigatoria: true, ajuda: AJUDA_DA_NOTA },
     }),
   },
+  // Editar abre a folha de edicao (componentes/edicao-do-prazo.js), com os campos e o aviso da data fatal: nao usa a confirmacao simples.
+  editar: {
+    tipo: 'prazo_editar', estilo: 'normal', icone: 'lapis', titulo: 'Editar o prazo',
+    ajuda: 'Muda o ato, as datas ou a observação. Se mudar a data fatal, é preciso conferir de novo.',
+  },
+  excluir: {
+    tipo: 'prazo_excluir', estilo: 'perigo', icone: 'lixeira', titulo: 'Excluir o prazo',
+    ajuda: 'Tira o prazo das listas, da agenda e do celular. Não há como desfazer pela tela.',
+    ajudaSeNaoCumprido: 'Prazo “Não cumprido” não pode ser excluído: o registro fica para controle. Se foi engano, reabra o prazo com uma nota.',
+    dados: (nota) => ({ ...(nota ? { nota } : {}) }),
+    confirmacao: (prazo) => ({
+      titulo: 'Excluir este prazo?',
+      texto: `Prazo: ${prazo.ato}. Ele vai sumir das listas, da agenda e do celular. O registro continua guardado no sistema, mas não há como desfazer pela tela: `
+        + 'se foi engano, será preciso lançar o prazo de novo. Se o prazo veio de uma publicação do DJEN, a publicação continua como confirmada e o prazo não é criado outra vez. '
+        + 'Só o computador executa o pedido, quando estiver ligado e com internet.',
+      rotuloConfirmar: 'Sim, excluir', perigo: true,
+      nota: { rotulo: 'Anotação', ajuda: AJUDA_DA_NOTA, maximo: LIMITE_DA_NOTA_DE_EXCLUSAO },
+    }),
+  },
 };
 
 /** Frase simples para a falha de enviar um pedido. */
@@ -267,12 +293,13 @@ export function fraseDeErroDeEnvio(erro) {
   return 'Não foi possível enviar o pedido. Tente de novo.';
 }
 
-function botaoDeAcao(acao, { desativado, aoClicar }) {
+/** `desativado` liga o botao desligado; `ajuda` troca a frase de baixo (padrao: a do pedido, ou "Pedido ja enviado" se desligado). */
+function botaoDeAcao(acao, { desativado, aoClicar, ajuda = null }) {
   return h('button', { class: ['acao', `acao--${acao.estilo}`], type: 'button', disabled: desativado, onclick: aoClicar },
     h('span', { class: 'acao-icone' }, icone(acao.icone, { tamanho: 24 })),
     h('span', { class: 'acao-texto' },
       h('span', { class: 'acao-titulo' }, acao.titulo),
-      h('span', { class: 'acao-ajuda' }, desativado ? 'Pedido já enviado: aguardando o computador.' : acao.ajuda)));
+      h('span', { class: 'acao-ajuda' }, ajuda || (desativado ? 'Pedido já enviado: aguardando o computador.' : acao.ajuda))));
 }
 
 function cabecalhoDoPrazo(prazo, hoje) {
@@ -401,6 +428,18 @@ function montarDetalhe(ctx) {
     slot.el.replaceChildren(...(Array.isArray(conteudo) ? conteudo : [conteudo]).filter(Boolean));
   }
 
+  /** O UNICO lugar que manda pedido ao computador. Devolve null se saiu, ou a frase simples do que deu errado. */
+  async function enviar(tipo, dadosDoPedido) {
+    try {
+      await dados.enviarComando(tipo, id, dadosDoPedido);
+      anunciar('Pedido enviado. Aguardando o computador.');
+      return null;
+    } catch (erro) {
+      return fraseDeErroDeEnvio(erro);
+    }
+  }
+
+  /** Os pedidos de uma confirmacao so (conferi, protocolado, cumprido, nao cumprido, reabrir, excluir). */
   async function pedir(acao) {
     if (enviando) return;
     const prazo = dados.linha('prazo', id);
@@ -413,28 +452,63 @@ function montarDetalhe(ctx) {
     enviando = true;
     erroDeEnvio.hidden = true;
     try {
-      await dados.enviarComando(acao.tipo, prazo.id, acao.dados(resposta.nota));
-      anunciar('Pedido enviado. Aguardando o computador.');
-      pedidosSecao.scrollIntoView({ block: 'center' });
-    } catch (erro) {
-      erroDeEnvio.textContent = fraseDeErroDeEnvio(erro);
-      erroDeEnvio.hidden = false;
+      const falha = await enviar(acao.tipo, acao.dados(resposta.nota, prazo));   // `prazo` e o que a pessoa viu ao confirmar (data_vista)
+      if (falha) {
+        erroDeEnvio.textContent = falha;
+        erroDeEnvio.hidden = false;
+      } else {
+        pedidosSecao.scrollIntoView({ block: 'center' });
+      }
     } finally {
       enviando = false;
     }
   }
 
+  /** Editar: abre a folha com os campos; ela manda so o que mudou e, se o envio falhar, continua aberta com o que a pessoa escreveu. */
+  async function editar() {
+    if (enviando) return;
+    const prazo = dados.linha('prazo', id);
+    if (!prazo) return;
+    erroDeEnvio.hidden = true;
+    let enviou = false;
+    const edicao = abrirEdicaoDoPrazo({
+      prazo,
+      aoEnviar: async (dadosDoPedido) => {
+        if (enviando) return 'Outro pedido está sendo enviado agora. Espere um instante e tente de novo.';
+        enviando = true;
+        try {
+          const falha = await enviar('prazo_editar', dadosDoPedido);
+          enviou = !falha;
+          return falha;
+        } finally {
+          enviando = false;
+        }
+      },
+    });
+    await edicao.fechada;
+    if (enviou) pedidosSecao.scrollIntoView({ block: 'center' });
+  }
+
   function construirAcoes(prazo) {
     const pendentes = dados.comandosDoAlvo(id).filter((c) => c.estado === 'enviado');
-    const jaPediuConferir = pendentes.some((c) => c.tipo === 'prazo_conferir');
+    const jaPediu = (tipo) => pendentes.some((c) => c.tipo === tipo);
     const jaPediuStatus = (status) => pendentes.some((c) => c.tipo === 'prazo_status' && c.dados && c.dados.status === status);
     const botao = (chave) => {
       const acao = ACOES[chave];
-      const desativado = chave === 'conferir' ? jaPediuConferir : jaPediuStatus(acao.status);
-      return botaoDeAcao(acao, { desativado, aoClicar: () => pedir(acao) });
+      if (acao.tipo === 'prazo_excluir' && prazo.status === 'perdido') {
+        // o registro de "Nao cumprido" fica para controle: o botao existe, mas desligado, e a frase de baixo explica
+        return botaoDeAcao(acao, { desativado: true, ajuda: acao.ajudaSeNaoCumprido });
+      }
+      if (acao.tipo === 'prazo_conferir' && !jaPediu('prazo_conferir') && jaPediu('prazo_editar')) {
+        // a data que o celular mostra ainda e a antiga: conferir agora seria conferir uma data que a pessoa pode ter mandado mudar
+        return botaoDeAcao(acao, { desativado: true, ajuda: acao.ajudaSeHaEdicaoPendente });
+      }
+      const desativado = acao.tipo === 'prazo_status' ? jaPediuStatus(acao.status) : jaPediu(acao.tipo);
+      return botaoDeAcao(acao, { desativado, aoClicar: () => (acao.tipo === 'prazo_editar' ? editar() : pedir(acao)) });
     };
     if (!prazoAberto(prazo)) {
-      return [h('p', null, `Este prazo está encerrado (${(ROTULO_STATUS[prazo.status] || prazo.status).toLowerCase()}). Se precisar mexer nele de novo, peça para reabrir.`), botao('reabrir')];
+      return [h('p', null, `Este prazo está encerrado (${(ROTULO_STATUS[prazo.status] || prazo.status).toLowerCase()}). Se precisar mexer nele de novo, peça para reabrir.`),
+        botao('reabrir'), botao('editar'), botao('excluir')];
     }
     const filhos = [];
     if (prazoNaoConferido(prazo)) {
@@ -447,7 +521,7 @@ function montarDetalhe(ctx) {
     } else {
       filhos.push(h('p', { class: 'conferido-aviso' }, icone('ok', { tamanho: 20 }), `Data fatal conferida${prazo.conferido_em && momentoOuData(prazo.conferido_em) ? ` em ${momentoOuData(prazo.conferido_em)}` : ''}.`));
     }
-    filhos.push(botao('protocolado'), botao('cumprido'), botao('perdido'));
+    filhos.push(botao('protocolado'), botao('cumprido'), botao('perdido'), botao('editar'), botao('excluir'));
     return filhos;
   }
 
@@ -458,11 +532,28 @@ function montarDetalhe(ctx) {
       montado = false;
       assinaturaDasAcoes = null;
       for (const s of slots.values()) s.assinatura = null;
-      preencher(ctx.raiz, semDadosAinda(estado, () => dados.atualizar()) || vazio({
-        icone: 'info', titulo: 'Prazo não encontrado',
-        texto: 'Este prazo não está nos dados deste aparelho. Ele pode ter sido arquivado ou o computador ainda não o enviou.',
-        acao: h('a', { class: 'botao', href: href('/prazos') }, 'Ver os prazos'),
-      }));
+      // Se este aparelho pediu para excluir o prazo e o computador ja aplicou, ele sumiu do espelho de proposito: nao e "nao encontrado".
+      const pedidosDeExclusao = dados.comandosDoAlvo(id).filter((c) => c.tipo === 'prazo_excluir');
+      const excluidoAPedido = pedidosDeExclusao.some((c) => c.estado === 'aplicado');
+      // O espelho pode perder o prazo antes de o aparelho saber da resposta (ele consulta os pedidos de tempos em tempos): se o pedido de excluir
+      // ainda consta como enviado, o prazo que sumiu e o que a pessoa mandou excluir, nao um "nao encontrado".
+      const exclusaoEnviada = !excluidoAPedido && pedidosDeExclusao.some((c) => c.estado === 'enviado');
+      const botaoDaLista = h('a', { class: 'botao', href: href('/prazos') }, 'Ver os prazos');
+      preencher(ctx.raiz, semDadosAinda(estado, () => dados.atualizar()) || (excluidoAPedido
+        ? vazio({
+          icone: 'ok', variante: 'ok', titulo: 'Este prazo foi excluído a seu pedido.',
+          texto: 'Ele saiu das listas e da agenda. O registro continua guardado no sistema.', acao: botaoDaLista,
+        })
+        : exclusaoEnviada
+          ? vazio({
+            icone: 'relogio', titulo: 'Pedido de exclusão enviado.',
+            texto: 'O prazo já saiu dos dados deste aparelho. Falta só o computador confirmar o pedido.', acao: botaoDaLista,
+          })
+          : vazio({
+            icone: 'info', titulo: 'Prazo não encontrado',
+            texto: 'Este prazo não está nos dados deste aparelho. Ele pode ter sido arquivado ou o computador ainda não o enviou.',
+            acao: botaoDaLista,
+          })));
       return;
     }
     if (!montado) {
