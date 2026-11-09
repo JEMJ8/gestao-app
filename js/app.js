@@ -1,12 +1,14 @@
 // Ponto de entrada. Faz tres coisas, nesta ordem:
 //   1. aplica o tema e registra o service worker (a casca do aplicativo fica guardada para abrir sem internet);
-//   2. sem sessao completa (senha + codigo), mostra a tela de entrada; com sessao, abre o aplicativo;
+//   2. sem sessao completa (senha + codigo), mostra a tela de entrada; com sessao e SEM a trava do aplicativo ligada, abre o aplicativo;
+//      com sessao e a trava ligada, pede o desbloqueio do celular ANTES de montar qualquer coisa (js/telas/trava.js);
 //   3. abrir o aplicativo = montar a casca, carregar o cache, ligar o roteador e atualizar os dados em segundo plano.
 //
 // Para criar uma tela nova: crie js/telas/<nome>.js, chame registrar(...) la e adicione UMA linha de import aqui embaixo.
 // Guia completo: docs/CELULAR-APP.md.
 
 import * as auth from './auth.js';
+import * as bio from './biometria.js';
 import * as dados from './dados.js';
 import * as rotas from './rotas.js';
 import { montarCasca } from './casca.js';
@@ -25,6 +27,7 @@ import './telas/processos.js';
 import './telas/clientes.js';
 import './telas/financeiro.js';
 import { montarEntrada } from './telas/entrada.js';
+import * as trava from './telas/trava.js';
 
 const conteudo = document.getElementById('conteudo');
 let aberto = false;
@@ -33,10 +36,11 @@ function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   // Versao nova publicada: o service worker novo assume sozinho. Na tela de entrada, e so se ninguem digitou nada, a pagina recarrega para
   // mostrar a versao nova na hora (em vez de so na proxima abertura). Com o aplicativo aberto nunca recarrega: a pessoa pode estar no meio de algo.
+  // Tambem nao recarrega com a trava na tela nem com o desbloqueio do celular em andamento (a janela do sistema ficaria sem a pagina).
   const tinhaControlador = Boolean(navigator.serviceWorker.controller);
   let recarregou = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!tinhaControlador || aberto || recarregou) return;
+    if (!tinhaControlador || aberto || recarregou || bio.ocupado() || trava.emTela()) return;
     if ([...document.querySelectorAll('input')].some((campo) => campo.value)) return;
     recarregou = true;
     window.location.reload();
@@ -87,6 +91,8 @@ function estenderContexto(ctx) {
 async function abrirAplicativo() {
   if (aberto) return;
   aberto = true;
+  trava.vigiar();                       // PRIMEIRA coisa: o vigia da trava precisa existir antes de qualquer espera
+  auth.pedirArmazenamentoDuravel();     // sem esperar: so pede ao navegador para nao apagar os dados do aplicativo sozinho
   conteudo.replaceChildren();
   conteudo.classList.remove('conteudo--entrada');
   barraDaEntrada(false);
@@ -108,11 +114,28 @@ async function abrirAplicativo() {
   });
 }
 
-function mostrarEntrada() {
+/** `opcoes` vai para a tela de entrada (daTrava: a pessoa veio da trava e pode voltar a ela). */
+function mostrarEntrada(opcoes = {}) {
   aplicarTema();
   barraDaEntrada(true);
   conteudo.classList.add('sem-barra', 'conteudo--entrada');
-  montarEntrada(conteudo, { aoConcluir: abrirAplicativo });
+  montarEntrada(conteudo, { aoConcluir: abrirAplicativo, ...opcoes });
+}
+
+/** Abertura a frio com a trava ligada: so a trava aparece. A casca, os dados e o roteador so nascem quando o desbloqueio funciona. */
+function pedirTrava() {
+  trava.pedir({ modo: 'frio', aoLiberar: abrirAplicativo, aoSenha: irParaSenha });
+}
+
+/** "Entrar com senha e codigo" na trava: sai dela e mostra a entrada, com um caminho de volta ao desbloqueio. */
+function irParaSenha() {
+  trava.fechar();
+  mostrarEntrada({ daTrava: { aoVoltar: voltarAoDesbloqueio } });
+}
+
+function voltarAoDesbloqueio() {
+  conteudo.replaceChildren();
+  pedirTrava();
 }
 
 async function iniciar() {
@@ -120,8 +143,18 @@ async function iniciar() {
   aplicarTema();
   guardaDoVisual();
   registrarServiceWorker();
-  if (auth.temSessaoCompleta()) await abrirAplicativo();
-  else mostrarEntrada();
+  if (!auth.temSessaoCompleta()) {
+    trava.consumirPedidoDeSenha();   // pedido velho que ficou no historico: descarta
+    mostrarEntrada();
+    return;
+  }
+  if (!auth.biometriaLigada()) {
+    trava.consumirPedidoDeSenha();
+    await abrirAplicativo();
+    return;
+  }
+  if (trava.consumirPedidoDeSenha()) irParaSenha();
+  else pedirTrava();
 }
 
 iniciar();

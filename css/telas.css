@@ -47,3 +47,21 @@
 .cartao--nao-conferido p + p { margin-top: var(--e2); }
 
 /* A tela de entrada (login e segundo fator) tem o proprio arquivo: css/tela-entrada.css. */
+
+/* ---------------------------------------------------------------- Ajustes: cartao "Trava do aplicativo" (js/telas/ajustes.js) */
+/* O corpo do cartao vira uma coluna com respiro entre o estado, os avisos, as mensagens, os botoes e o "Mais opcoes". */
+.cartao[data-cartao="trava"] .cartao-corpo { display: flex; flex-direction: column; gap: var(--e3); }
+.cartao[data-cartao="trava"] [data-trava-cartao="status"] { font-weight: 600; }
+/* Mensagem vazia sai da vista mas continua na pagina: o leitor de tela so le o que muda numa regiao que ja existia. */
+.cartao[data-cartao="trava"] [data-trava-cartao="status"]:empty { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* Botoes empilhados, de largura cheia (Testar agora e Desligar; Trancar agora e Refazer; Ligar; Conferir). */
+.cartao-acoes { display: flex; flex-direction: column; gap: var(--e2); }
+.cartao-acoes .botao { width: 100%; }
+
+/* Aviso laranja "a trava foi desligada em ... porque a sessao acabou". Cor e texto dizem a mesma coisa (icone de alerta). */
+.trava-cartao-aviso { display: flex; align-items: flex-start; gap: var(--e2); padding: var(--e3); background: var(--atencao-fundo); border-radius: var(--raio-2); color: var(--atencao); font-size: var(--t-pequeno); font-weight: 600; }
+.trava-cartao-aviso .icone { flex: none; margin-top: 2px; }
+
+/* "Mais opcoes" dentro do cartao: separado do resto por uma linha; o espaco entre os filhos vem de .entrada-detalhes. */
+.cartao [data-trava-cartao="mais"] { padding-top: var(--e2); border-top: 1px solid var(--linha); }

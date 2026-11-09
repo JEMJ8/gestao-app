@@ -1,0 +1,53 @@
+/* Trava do aplicativo (js/telas/trava.js) e as pecas que a oferta de ligar a trava (js/telas/entrada.js) divide com ela.
+   A trava e um <dialog> aberto por showModal() por cima de tudo: tela cheia, fundo opaco, sem moldura. Cor so por variavel de tokens.css.
+   Nada de texto abaixo de 14 px (a area de estado fica em 16 px), toque de 44 px no minimo, sem altura fixa, sem rolagem lateral. */
+
+dialog.trava { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; overflow-y: auto; background: var(--fundo); color: var(--texto); }
+dialog.trava:not([open]) { display: none; }
+dialog.trava::backdrop { background: var(--fundo); }
+dialog.trava .entrada-tela { min-height: 100%; }
+
+/* Plano B e vigia: enquanto a pagina esta coberta (saiu do aplicativo e ainda nao se sabe se tranca), nem o aplicativo nem as folhas aparecem. */
+html[data-coberta] #app, html[data-coberta] dialog:not(.trava) { visibility: hidden; }
+
+/* ---------------------------------------------------------------- cabeca menor (trava e oferta)
+   Mesma cabeca da entrada, so mais baixa e sem a frase de baixo, para o botao principal caber na primeira tela. */
+.entrada-tela--compacta .entrada-hero { padding-top: calc(var(--e4) + env(safe-area-inset-top)); padding-bottom: calc(var(--e4) + var(--e5)); }
+.entrada-tela--compacta .entrada-marca { width: 56px; height: 56px; margin-bottom: var(--e2); box-shadow: 0 0 0 6px var(--hero-vidro); }
+.entrada-tela--compacta .entrada-marca .marca { width: 32px; }
+.entrada-tela--compacta .entrada-sub { display: none; }
+.entrada-tela--compacta .entrada-titulo { font-size: var(--t-titulo); }
+
+/* ---------------------------------------------------------------- o passo da trava */
+/* No celular a folha ocupa a altura toda: o passo cresce e as acoes ficam na base, onde o polegar alcanca. */
+dialog.trava .entrada-folha { display: flex; flex-direction: column; }
+dialog.trava .trava-passo { flex: 1 0 auto; }
+.trava-passo { display: flex; flex-direction: column; gap: var(--e3); }
+.trava-passo .trava-acoes { margin-top: auto; }
+
+.trava-pequeno { color: var(--texto-2); font-size: var(--t-pequeno); }
+
+/* Area de estado (informativa) e area de alerta. Vazia, a area de estado sai da vista mas continua na pagina (o leitor de tela so le
+   o que muda numa regiao que ja existia). */
+.trava-estado { color: var(--texto-2); font-size: var(--t-corpo); }
+.trava-estado:empty { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.trava-estado--atencao {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--e2);
+  padding: var(--e3) var(--e4);
+  background: var(--atencao-fundo);
+  border-radius: var(--raio-2);
+  color: var(--atencao);
+  font-weight: 600;
+}
+.trava-estado--atencao .icone { flex: none; margin-top: 2px; }
+
+/* Acoes presas na base: o botao principal nunca sai da primeira tela, mesmo com letra grande ou tela baixa. */
+.trava-acoes { position: sticky; bottom: 0; display: flex; flex-direction: column; gap: var(--e2); padding: var(--e3) 0 calc(var(--e3) + env(safe-area-inset-bottom)); background: var(--superficie); }
+
+.trava-acoes .botao { min-height: var(--alvo); }
+
+.trava-acoes .botao--grande { min-height: 52px; }
+
+.trava-internet { color: var(--texto-2); font-size: var(--t-pequeno); text-align: center; }

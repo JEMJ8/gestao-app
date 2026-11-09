@@ -30,6 +30,8 @@ let versao = 0;
 let posicao = 0;          // quantas entradas de historico do aplicativo existem antes desta
 let pendentes = 0;        // popstates provocados pelo proprio roteador (a ignorar)
 let depoisDeVoltar = null;
+let suspenso = false;                 // a trava do aplicativo esta na tela: o Voltar do aparelho nao troca de tela nem fecha folha
+let ultimoPopFoiDoRoteador = false;   // o ultimo popstate foi provocado pelo proprio roteador (a trava ignora esse)
 const camadas = [];
 
 const CAMINHO_PADRAO = '/hoje';
@@ -182,9 +184,32 @@ function fecharCamadas(depois) {
   window.history.go(-quantas);
 }
 
+/**
+ * Enquanto `sim` for verdadeiro (a trava do aplicativo esta na tela), o Voltar do aparelho nao troca de tela nem fecha folha: o roteador
+ * so acompanha a posicao do historico. Quem suspende tem de chamar suspender(false) e ressincronizar() ao terminar.
+ */
+export function suspender(sim) {
+  suspenso = Boolean(sim);
+}
+
+/** O ultimo popstate foi provocado pelo proprio roteador (ao fechar uma folha, por exemplo)? A trava ignora esse e trata os da pessoa. */
+export function ultimoPopDoRoteador() {
+  return ultimoPopFoiDoRoteador;
+}
+
+/** Depois de uma suspensao: acerta a posicao do historico e, se o endereco nao e mais o da tela que esta montada, monta a tela do endereco. */
+export function ressincronizar() {
+  posicao = posicaoDoHistorico();
+  if (!raiz) return;
+  const { caminho } = lerHash(window.location.hash);
+  if (!atual || atual.info.caminho !== caminho) rotear();
+}
+
 function aoVoltarPeloHistorico() {
+  ultimoPopFoiDoRoteador = false;
   posicao = posicaoDoHistorico();
   if (pendentes > 0) {
+    ultimoPopFoiDoRoteador = true;
     pendentes -= 1;
     if (pendentes === 0 && depoisDeVoltar) {
       const fn = depoisDeVoltar;
@@ -193,6 +218,7 @@ function aoVoltarPeloHistorico() {
     }
     return;
   }
+  if (suspenso) return;
   const topo = camadas[camadas.length - 1];
   if (topo) {
     if (topo.antesDeVoltar && topo.antesDeVoltar()) {

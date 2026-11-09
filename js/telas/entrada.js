@@ -4,12 +4,21 @@
 // abrir o autenticador; no iPhone ele nao e confiavel e nao aparece. Se a pagina recarregar no meio (a pessoa foi ao autenticador e voltou),
 // a entrada continua de onde parou, sem pedir a senha de novo.
 // Nao e uma rota: app.js a desenha no lugar do aplicativo enquanto nao houver sessao completa (senha + codigo).
+//
+// Depois do codigo aceito vem a oferta da trava do aplicativo (telaDeOferta): em todo login completo enquanto a trava estiver desligada,
+// ou, com a trava ja registrada, "Manter / Refazer / Desligar". A oferta so mexe na trava por auth.js (ligar, desligar) e pede a criacao
+// da credencial a biometria.js; falha nenhuma grava nada. Erro na oferta nunca prende a pessoa: a sessao completa ja esta guardada e o
+// aplicativo abre do mesmo jeito (aposOCodigo).
+// A tela de senha tambem e usada pela trava (daTrava): a pessoa tocou em "Entrar com senha e codigo" e pode voltar ao desbloqueio.
 
 import { h, preencher, novoId, focar, copiarTexto, esperar, anunciar } from '../ui.js';
 import { icone } from '../icones.js';
 import { marca } from '../marca.js';
 import { linkHttps } from '../formato.js';
+import { emCuiaba, dataBR } from '../datas.js';
 import * as auth from '../auth.js';
+import * as bio from '../biometria.js';
+import * as trava from './trava.js';
 import { VERSAO_APP } from '../versao.js';
 
 // ---------------------------------------------------------------- aparelho e instalacao
@@ -39,6 +48,90 @@ const LOJAS = {
 };
 
 const AVISO_CHAVE_NOVA = 'A chave anterior perdeu a validade e geramos uma chave nova. Se você já tinha adicionado "Gestão JEMJ" no autenticador, apague essa entrada antiga e adicione a nova.';
+
+// ---------------------------------------------------------------- textos da trava (catalogo do contrato, secoes 12.2 a 12.4)
+
+// A oferta de ligar a trava. "Senha" nas telas e sempre a senha da conta; o desbloqueio do celular e descrito como "o mesmo desbloqueio que
+// voce usa para abrir o celular". Nenhuma promessa de rapidez e nenhum numero de dias.
+const OF = {
+  TITULO: 'Trava do aplicativo',
+  LEAD: 'Isto não deixa o acesso mais rápido, deixa mais protegido.',
+  L1: 'O aplicativo só abre depois do desbloqueio do celular, normalmente o mesmo que você usa para abrir o próprio celular.',
+  L2: 'Quem consegue desbloquear o seu celular também abre o aplicativo.',
+  L3: 'Se o desbloqueio falhar, só se entra com senha e código, e isso precisa de internet.',
+  LIGAR: 'Ligar a trava',
+  AGORA_NAO: 'Agora não',
+  // depois de uma falha as frases dizem "continuar sem a trava": o botao de saida tem o mesmo nome
+  CONTINUAR_SEM: 'Continuar sem a trava',
+  MANTER: 'Manter a trava como está',
+  REFAZER: 'Refazer a trava',
+  DESLIGAR: 'Desligar a trava',
+  TENTAR: 'Tentar de novo',
+  CONTINUAR: 'Continuar',
+  AGUARDANDO: 'Aguardando o celular…',
+  SAIBA_MAIS: 'Saiba mais',
+  FAIXA_HAVIA: 'Você entrou com senha e código. A trava continua ligada. Se ela não abriu o aplicativo, toque em Refazer a trava.',
+  JANELA: 'O celular vai abrir uma janela própria. Ela pode falar em chave de acesso e mostrar jemj8.github.io. É normal. Siga as instruções dela.',
+  FALHOU: 'Não foi ligada. Você pode tentar de novo ou continuar sem a trava.',
+  FALHOU_REFAZER: 'Não foi refeita. A trava antiga continua como estava.',
+  DEMOROU: 'A confirmação demorou e foi encerrada. Você pode tentar de novo ou continuar sem a trava.',
+  GRAVACAO: 'Não foi possível guardar a trava neste celular. Você pode tentar de novo ou continuar sem ela.',
+  SEM_SUPORTE: 'Este navegador não consegue ligar a trava do aplicativo agora. Você pode continuar sem ela.',
+  ICONE_FALHOU: 'A trava não funcionou neste aparelho, no ícone da tela inicial. Você pode continuar sem ela.',
+  // Refazer, com trava antiga: ela segue ligada, entao nao se pode dizer que se continua sem ela
+  ICONE_FALHOU_REFAZER: 'A trava não funcionou neste aparelho, no ícone da tela inicial. A trava antiga continua como estava.',
+  // fora do catalogo: o contrato nao cobre a gravacao do "desligar" falhar (ver o relatorio da F4)
+  DESLIGAR_FALHOU: 'Não foi possível desligar a trava agora. Ela continua ligada. Você pode tentar de novo ou manter a trava como está.',
+};
+
+const SAIBA_MAIS_ANTES = [
+  'Quando você abrir o Gestão JEMJ, o celular vai pedir o desbloqueio dele, normalmente o mesmo que você usa para abrir o celular: digital, rosto, PIN ou padrão, conforme o seu aparelho. Esses dados ficam no celular, não no aplicativo. A chave de acesso pode aparecer em outros aparelhos da mesma conta Apple ou Google, mas sem a sessão guardada neles ela não abre nada.',
+  'A trava vale para abrir o aplicativo de novo. Quando a sessão acabar, ou depois de sair, o primeiro acesso continua sendo com senha e código.',
+  'Isto fecha a porta do aplicativo. Os dados guardados no celular não ficam embaralhados.',
+  'Vale o que vale o bloqueio de tela do seu celular. Qualquer digital ou rosto cadastrado nele abre o aplicativo.',
+  'Quem tem o seu celular desbloqueado, a sua senha e o autenticador no mesmo celular consegue entrar de novo com senha e código, mesmo com a trava ligada. Se o autenticador tem bloqueio próprio e a senha não fica salva no celular, essa porta fica fechada.',
+  'O aplicativo tranca quando você sai dele e volta depois do prazo escolhido. Com ele aberto na sua mão, não tranca sozinho.',
+  'Se o desbloqueio não funcionar, você entra com senha e código, e para isso precisa de internet. Teste uma vez com sinal, em Mais, Ajustes, no botão Testar agora.',
+  'O celular vai abrir uma janela própria, que pode falar em chave de acesso e mostrar o endereço jemj8.github.io. É normal.',
+];
+const SAIBA_MAIS_IPHONE_NO_SAFARI = 'No iPhone, o ícone da tela inicial costuma guardar os dados à parte do Safari. Ligue a trava no mesmo lugar onde você usa o aplicativo.';
+const SAIBA_MAIS_IPHONE_NO_ICONE = 'Você está usando o ícone da tela inicial. Ligue por aqui.';
+const SAIBA_MAIS_DEPOIS = 'Você desliga quando quiser em Mais, Ajustes.';
+
+// A tela "Tudo certo" e as notas dela.
+const TX = {
+  SU_PRIMEIRA: 'Da próxima vez, depois da senha, o Gestão JEMJ vai pedir o código do seu autenticador.',
+  // com a trava ligada a proxima abertura pede so o desbloqueio: senha e codigo voltam quando a sessao acabar (SU_LIGOU diz a primeira parte)
+  SU_PRIMEIRA_COM_TRAVA: 'Quando a sessão acabar, você entra de novo com a senha e o código do seu autenticador.',
+  SU_LIGOU: 'Trava ligada. Da próxima vez que você abrir o aplicativo, o celular vai pedir o desbloqueio.',
+  SU_CONTINUA: 'A trava continua ligada. Se ela não abrir o aplicativo da próxima vez, entre com senha e código.',
+  SU_DESLIGOU: 'A trava foi desligada. O aplicativo vai abrir direto neste celular.',
+  // a tela de senha aberta pela trava
+  SENHA_INTERNET: 'Entrar com a senha precisa de internet. Se a senha for aceita e você não digitar o código, o aplicativo não abre sem internet até você entrar de novo.',
+  VOLTAR: 'Voltar ao desbloqueio',
+  CODIGO_OUTRA_CONTA: 'Se tocar em Usar outra conta, a trava do aplicativo é desligada neste celular e você entra de novo com senha e código.',
+};
+
+/** Os paragrafos do "Saiba mais": 10 no iPhone (o nono depende de Safari ou ícone) e 9 nos demais aparelhos, sempre na ordem do catalogo. */
+function paragrafosDoSaibaMais() {
+  const aparelho = bio.aparelho();
+  const doIphone = aparelho.iphone ? [aparelho.instalado ? SAIBA_MAIS_IPHONE_NO_ICONE : SAIBA_MAIS_IPHONE_NO_SAFARI] : [];
+  return [...SAIBA_MAIS_ANTES, ...doIphone, SAIBA_MAIS_DEPOIS];
+}
+
+/** "A trava foi desligada em dd/mm/aaaa porque a sessao acabou." Sem data legivel, a mesma frase sem a data. */
+function textoDaFaixaCaiu(epoch) {
+  const quando = emCuiaba(epoch);
+  const data = quando ? dataBR(quando.data) : '';
+  return `A trava do aplicativo foi desligada${data ? ` em ${data}` : ''} porque a sessão acabou. Ligue de novo para continuar protegido.`;
+}
+
+// Quantas vezes seguidas a criacao da credencial falhou nesta pagina. So memoria: some a cada recarga e volta a zero quando uma trava e ligada.
+let falhasDeCriar = 0;
+
+const CLASSES_PRINCIPAL = ['botao--primario', 'botao--grande', 'botao--cheio', 'botao--destaque'];
+const CLASSES_SECUNDARIO = ['botao--contorno', 'botao--cheio'];
+const CLASSES_DISCRETO = ['botao--discreto', 'botao--cheio'];
 
 // Os nomes dos botoes dos aplicativos mudam de versao para versao e nao foram conferidos em fonte oficial: o texto descreve a funcao e traz o nome
 // entre aspas como pista.
@@ -76,7 +169,10 @@ const GUIAS = [
 /** O endereco otpauth:// que tenta abrir o autenticador no proprio aparelho. Qualquer outra coisa vira null (o atalho nem aparece). */
 export function enderecoDoAutenticador(uri) {
   const texto = String(uri || '').trim();
-  return /^otpauth:\/\/totp\/[^\s"'<>]+$/.test(texto) && /[?&]secret=[A-Za-z2-7]+/.test(texto) ? texto : null;
+  // sem literal de expressao regular com barras duplas ou aspas (a varredura sem_comentarios_js dos testes nao os entende): \x22 e \x27 sao " e '
+  const prefixo = 'otpauth://totp/';
+  const corpoLimpo = texto.length > prefixo.length && texto.startsWith(prefixo) && !/[\s\x22\x27<>]/.test(texto);
+  return corpoLimpo && /[?&]secret=[A-Za-z2-7]+/.test(texto) ? texto : null;
 }
 
 let conviteDeInstalacao = null;
@@ -105,6 +201,13 @@ function agrupar(segredo) {
 function botao(rotulo, { nome = null, classes = [], tipo = 'button', aoClicar = null } = {}) {
   const el = h('button', { class: ['botao', ...classes], type: tipo }, nome ? icone(nome) : null, rotulo);
   if (aoClicar) el.addEventListener('click', aoClicar);
+  return el;
+}
+
+/** Botao da oferta da trava: o `nome` vai para data-oferta (ligar, agora-nao, manter, refazer, desligar, tentar, continuar). */
+function botaoDaOferta(nome, rotulo, classes, aoClicar) {
+  const el = botao(rotulo, { classes, aoClicar });
+  el.setAttribute('data-oferta', nome);
   return el;
 }
 
@@ -291,15 +394,23 @@ function blocoDeInstalacao() {
 
 // ---------------------------------------------------------------- a tela
 
-/** Desenha a entrada em `raiz`. `aoConcluir()` e chamada quando a sessao completa (aal2) estiver guardada. */
-export function montarEntrada(raiz, { aoConcluir }) {
+/**
+ * Desenha a entrada em `raiz`. `aoConcluir()` e chamada quando a sessao completa (aal2) estiver guardada.
+ * `daTrava` ({ aoVoltar }) so existe quando a pessoa chegou aqui pelo botao "Entrar com senha e codigo" da trava: a primeira tela de senha
+ * ganha o aviso de internet e o botao "Voltar ao desbloqueio".
+ */
+export function montarEntrada(raiz, { aoConcluir, daTrava = null }) {
   document.title = 'Entrar · Gestão JEMJ';
   const folha = esqueleto(raiz);
   const noCelular = plataforma() !== 'outro';
 
-  /** Troca o passo: volta ao topo, leva o foco ao titulo (leitor de tela e teclado) e fala o aviso, que entra ja escrito e o leitor nao leria sozinho. */
+  /**
+   * Troca o passo: volta ao topo, leva o foco ao titulo (leitor de tela e teclado) e fala o aviso, que entra ja escrito e o leitor nao leria sozinho.
+   * Devolve o elemento do passo (a oferta da trava poe nele a sua classe).
+   */
   function mostrar(aviso, ...filhos) {
-    preencher(folha, h('div', { class: 'entrada-passo' }, ...filhos, rodape()));
+    const passo = h('div', { class: 'entrada-passo' }, ...filhos, rodape());
+    preencher(folha, passo);
     window.scrollTo(0, 0);
     const titulo = folha.querySelector('.entrada-passo-titulo');
     if (titulo) {
@@ -307,20 +418,79 @@ export function montarEntrada(raiz, { aoConcluir }) {
       focar(titulo);
     }
     if (aviso) anunciar(aviso);
+    return passo;
   }
 
-  async function sucesso(primeiraVez) {
+  /**
+   * A tela "Tudo certo". Sem nota importante ela avanca sozinha, como sempre (650 ms, ou 1800 ms com a nota do primeiro acesso). Com nota importante
+   * (a trava foi ligada, desligada ou continua ligada) espera o toque em Continuar, para dar tempo de ler. `tinha`: a trava ja estava ligada antes
+   * desta entrada. `resultado`: a escolha na oferta (ou null se nao houve oferta).
+   */
+  async function sucesso(primeiraVez, { tinha = false, resultado = null } = {}) {
+    const acao = resultado && typeof resultado === 'object' ? resultado.acao : null;
+    const notas = [];
+    let importante = false;
+    let ligadaAgora = false;
+    try { ligadaAgora = auth.biometriaLigada(); } catch { ligadaAgora = false; }
+    if (primeiraVez) notas.push(ligadaAgora ? TX.SU_PRIMEIRA_COM_TRAVA : TX.SU_PRIMEIRA);
+    if (acao === 'ligou' || acao === 'refez') {
+      notas.push(TX.SU_LIGOU);
+      importante = true;
+    } else if (acao === 'desligou') {
+      notas.push(TX.SU_DESLIGOU);
+      importante = true;
+    } else if (tinha && (acao === null || acao === 'sem_suporte')) {
+      // a trava ja estava ligada e a oferta nao mudou nada (nao houve oferta, ou o navegador nao deixou refazer)
+      notas.push(TX.SU_CONTINUA);
+      importante = true;
+    }
+    const continuar = importante
+      ? h('button', { class: 'botao botao--primario botao--grande', type: 'button', 'data-sucesso': 'continuar' }, OF.CONTINUAR)
+      : null;
+    // o que esta por baixo (a oferta, por exemplo) fica inerte: nem o teclado nem o leitor de tela chegam a botoes que o cartao cobre
+    for (const filho of [...raiz.children]) {
+      filho.inert = true;
+      filho.setAttribute('aria-hidden', 'true');
+    }
     raiz.appendChild(h('div', { class: 'entrada-sucesso', role: 'status' },
       h('div', { class: 'entrada-sucesso-bola' }, icone('check', { tamanho: 44 })),
-      h('span', null, 'Tudo certo. Abrindo…'),
-      primeiraVez ? h('p', { class: 'entrada-sucesso-nota' }, 'Da próxima vez, depois da senha, o Gestão JEMJ vai pedir o código do seu autenticador.') : null));
-    anunciar(primeiraVez ? 'Tudo certo. Da próxima vez, depois da senha, o Gestão JEMJ vai pedir o código do seu autenticador.' : 'Tudo certo. Abrindo.');
-    await esperar(primeiraVez ? 1800 : 650);   // o movimento reduzido tira a animacao (base.css), nao o tempo de leitura
+      h('span', null, continuar ? 'Tudo certo.' : 'Tudo certo. Abrindo…'),   // com Continuar nada abre sozinho: so diz "Abrindo" quando abre
+      notas.map((texto) => h('p', { class: 'entrada-sucesso-nota' }, texto)),
+      continuar));
+    anunciar(notas.length ? `Tudo certo. ${notas.join(' ')}` : 'Tudo certo. Abrindo.');
+    if (continuar) {
+      focar(continuar);
+      await new Promise((resolver) => continuar.addEventListener('click', resolver, { once: true }));
+    } else {
+      await esperar(primeiraVez ? 1800 : 650);   // o movimento reduzido tira a animacao (base.css), nao o tempo de leitura
+    }
     aoConcluir();
   }
 
+  /**
+   * Depois do codigo aceito: a oferta da trava (se o celular confirma ter bloqueio de tela) e a tela "Tudo certo". Erro na oferta nunca prende a
+   * pessoa: segue sem oferta, o campo da trava fica como estava e o aplicativo abre.
+   */
+  async function aposOCodigo(primeiraVez) {
+    let tinha = false;
+    let resultado = null;
+    // O vigia da trava ja vigia daqui, nao so depois de o aplicativo abrir: a pessoa pode largar o celular na oferta ou em "Tudo certo" e voltar
+    // horas depois, e a trava (se ligada) tem de trancar antes de o aplicativo abrir. Chamar de novo e inofensivo (abrirAplicativo chama tambem).
+    try { trava.vigiar(); } catch { /* sem o vigia antecipado o aplicativo abre do mesmo jeito: o vigia de abrirAplicativo continua valendo */ }
+    try {
+      tinha = auth.biometriaLigada();
+      const disponivel = await bio.disponivel();
+      if (disponivel !== 'nao') resultado = await telaDeOferta({ tinha });   // 'desconhecido' ainda oferece; so 'nao' pula
+    } catch {
+      resultado = null;
+    }
+    await sucesso(primeiraVez, { tinha, resultado });
+  }
+
   // ---------------------------------------------------------------- passo 1: e-mail e senha
-  function telaDeSenha(avisoInicial = '') {
+  // `daTrava` (este parametro, que esconde o de montarEntrada de proposito): so a primeira tela de senha, quando a pessoa veio da trava.
+  // "Usar outra conta" chama telaDeSenha() sem ele, e a tela volta a ser a de sempre.
+  function telaDeSenha(avisoInicial = '', { daTrava = null } = {}) {
     const idEmail = novoId('email');
     const idSenha = novoId('senha');
     const idErro = novoId('erro');
@@ -344,11 +514,18 @@ export function montarEntrada(raiz, { aoConcluir }) {
     if (avisoInicial) { erro.textContent = avisoInicial; erro.hidden = false; }
     const entrar = botao('Entrar', { classes: ['botao--primario', 'botao--grande', 'botao--cheio', 'botao--destaque'], tipo: 'submit' });
     entrar.append(icone('avancar'));
+    // Vindo da trava: o aviso de internet e o caminho de volta ao desbloqueio, logo depois do botao Entrar. Os campos ficam como sempre.
+    const voltarAoDesbloqueio = daTrava && typeof daTrava.aoVoltar === 'function'
+      ? botao(TX.VOLTAR, { classes: ['botao--discreto', 'botao--cheio'], aoClicar: () => daTrava.aoVoltar() })
+      : null;
+    if (voltarAoDesbloqueio) voltarAoDesbloqueio.setAttribute('data-entrada', 'voltar-trava');
     const formulario = h('form', { class: 'entrada-formulario', novalidate: true },
       h('div', { class: 'campo' }, h('label', { class: 'campo-rotulo', for: idEmail }, 'E-mail'), campoComIcone('email', email)),
       h('div', { class: 'campo' }, h('label', { class: 'campo-rotulo', for: idSenha }, 'Senha'), campoComIcone('cadeado', senha, olho)),
       erro,
-      entrar);
+      entrar,
+      voltarAoDesbloqueio ? h('p', { class: 'entrada-nota' }, TX.SENHA_INTERNET) : null,
+      voltarAoDesbloqueio);
     formulario.addEventListener('submit', esconderSenha);
     document.addEventListener('visibilitychange', aoMudarDeAba);
     ligar(formulario, entrar, 'Entrando…', erro, async () => {
@@ -368,7 +545,7 @@ export function montarEntrada(raiz, { aoConcluir }) {
         await telaDeCadastro();   // se falhar, a senha continua no campo: a pessoa so toca em Entrar de novo
         senha.value = '';
       }
-    });
+    }, voltarAoDesbloqueio ? [voltarAoDesbloqueio] : []);
     const instalar = blocoDeInstalacao();
     mostrar('',
       h('div', null, h('h2', { class: 'entrada-passo-titulo' }, 'Entrar na sua conta'), h('p', { class: 'entrada-passo-texto' }, 'Use o e-mail e a senha do seu acesso.')),
@@ -505,8 +682,11 @@ export function montarEntrada(raiz, { aoConcluir }) {
         focar(codigo.campo);
         throw Object.assign(e, { mensagemParaTela: auth.mensagemDeEntrada(e, cadastro ? 'cadastro' : 'codigo') });
       }
-      await sucesso(Boolean(cadastro));
+      await aposOCodigo(Boolean(cadastro));   // a oferta da trava e/ou "Tudo certo"; erro ali dentro nunca prende a pessoa
     }, [voltar]);
+
+    // "Usar outra conta" larga a sessao e o campo da trava (o cache de dados fica ate o Sair ou ate outra conta entrar): com a trava ligada, a pessoa e avisada antes de tocar
+    const notaDaOutraConta = auth.biometriaLigada() ? h('p', { class: 'entrada-nota' }, TX.CODIGO_OUTRA_CONTA) : null;
 
     if (cadastro) {
       mostrar(aviso,
@@ -515,18 +695,228 @@ export function montarEntrada(raiz, { aoConcluir }) {
         aviso ? h('div', { class: 'entrada-aviso entrada-aviso--atencao', role: 'status' }, icone('alerta'), h('span', null, aviso)) : null,
         ...cartoesDoCadastro(cadastro),
         h('section', { class: 'passo-cartao' }, formulario),
+        notaDaOutraConta,
         voltar);
     } else {
       mostrar('',
         h('div', null, h('h2', { class: 'entrada-passo-titulo' }, 'Código de segurança'), h('p', { class: 'entrada-passo-texto' }, 'Abra o seu autenticador e digite o código que ele mostra para Gestão JEMJ.')),
         formulario,
+        notaDaOutraConta,
         voltar);
       focar(codigo.campo);
     }
   }
 
+  // ---------------------------------------------------------------- passo 4: a oferta da trava do aplicativo
+  /**
+   * Devolve a escolha da pessoa: { acao: 'ligou' | 'refez' | 'manteve' | 'desligou' | 'agora_nao' | 'sem_suporte' }.
+   * Sem trava antes (`tinha` falso): [Ligar a trava, Agora nao]. Com trava ja registrada: [Manter, Refazer, Desligar].
+   * Falha de criacao ou de gravacao nunca grava nada e nunca prende a pessoa: sempre ha uma saida na tela. Os botoes de saida nunca ficam
+   * desabilitados, nem durante a espera do celular.
+   * Cada aoToque* chama a biometria direto do toque (sem async e sem await antes), porque o iPhone so abre a janela do desbloqueio assim.
+   */
+  function telaDeOferta({ tinha }) {
+    return new Promise((resolver) => {
+      const aviso = auth.avisoDaTrava();   // "a trava caiu": so existe se a sessao acabou com a trava ligada
+      let resolvido = false;
+      let aguardando = false;
+      let botaoOcupado = null;
+      const estado = h('p', { class: 'trava-estado', role: 'status', 'aria-live': 'polite', 'data-oferta': 'estado' });
+      const acoes = h('div', { class: 'trava-acoes' });
+
+      /** A mensagem da tela (status ou erro). Rola ate ela: as acoes ficam presas na base e podem cobrir o lugar dela numa tela baixa. */
+      function dizer(texto, atencao = false) {
+        estado.classList.toggle('trava-estado--atencao', atencao);
+        if (atencao) preencher(estado, icone('alerta', { tamanho: 20 }), h('span', null, texto));
+        else estado.textContent = texto;
+        try { estado.scrollIntoView({ block: 'center' }); } catch { /* o navegador pode nao ter: a mensagem continua na tela */ }
+      }
+
+      function calar() {
+        estado.classList.remove('trava-estado--atencao');
+        estado.textContent = '';
+      }
+
+      function terminar(resultado) {
+        if (resolvido) return;
+        resolvido = true;
+        aguardando = false;
+        const tela = folha.closest('.entrada-tela');
+        if (tela) tela.classList.remove('entrada-tela--compacta');
+        resolver(resultado);
+      }
+
+      /** O botao tocado vira "Aguardando o celular…" e a mensagem explica a janela propria do celular. */
+      function aguardar(ev) {
+        aguardando = true;
+        const alvo = (ev && ev.currentTarget) || acoes.querySelector('[data-oferta="ligar"], [data-oferta="tentar"], [data-oferta="refazer"]');
+        if (alvo) {
+          botaoOcupado = alvo;
+          ocupado(alvo, true, OF.AGUARDANDO);
+        }
+        dizer(OF.JANELA);
+        anunciar(OF.JANELA);
+      }
+
+      /** Troca os botoes por uma saida depois de uma falha. `soContinuar`: o navegador ou o aparelho nao deixa mesmo, so resta seguir sem a trava. */
+      function falhar(texto, refazer, soContinuar = false) {
+        aguardando = false;
+        botaoOcupado = null;
+        dizer(texto, true);
+        const novos = soContinuar
+          ? [botaoDaOferta('continuar', OF.CONTINUAR, CLASSES_PRINCIPAL, aoToqueContinuar)]
+          : [
+            botaoDaOferta('tentar', OF.TENTAR, CLASSES_PRINCIPAL, refazer ? aoToqueRefazer : aoToqueLigar),
+            refazer
+              ? botaoDaOferta('manter', OF.MANTER, CLASSES_DISCRETO, aoToqueManter)
+              : botaoDaOferta('agora-nao', OF.CONTINUAR_SEM, CLASSES_DISCRETO, aoToqueAgoraNao),
+          ];
+        preencher(acoes, ...novos);
+        focar(novos[0]);
+      }
+
+      /** A credencial nasceu: so conta como ligada se o armazenamento guardou mesmo (ligarBiometria confere de novo). Senao ela e esquecida. */
+      function aoCriada(credencial, antigo, refazer, minutos) {
+        if (resolvido) {
+          bio.esquecer(credencial.id);   // a pessoa ja saiu da oferta: a credencial que acabou de nascer nao serve a ninguem
+          return;
+        }
+        aguardando = false;
+        let gravou = false;
+        try {
+          gravou = auth.ligarBiometria({ id: credencial.id, transports: credencial.transports, minutos });
+        } catch {
+          gravou = false;
+        }
+        if (!gravou) {
+          bio.esquecer(credencial.id);
+          falhar(refazer ? OF.FALHOU_REFAZER : OF.GRAVACAO, refazer);
+          return;
+        }
+        falhasDeCriar = 0;
+        if (antigo && antigo !== credencial.id) bio.esquecer(antigo);
+        try { trava.carimbarVerificacao(); } catch { /* so memoria do vigia: nao pode prender a pessoa */ }
+        terminar({ acao: refazer ? 'refez' : 'ligou' });
+      }
+
+      function aoNaoCriada(erro, refazer) {
+        if (resolvido) return;   // por exemplo, abortado porque a pessoa tocou em Agora nao: a tela ja resolveu
+        aguardando = false;
+        const codigo = erro && erro.codigo;
+        if (codigo === 'abortado') {
+          // nada a dizer: so tira o "Aguardando" do botao (algo abortou o pedido sem a pessoa sair da oferta)
+          if (botaoOcupado) ocupado(botaoOcupado, false);
+          botaoOcupado = null;
+          if (estado.textContent === OF.JANELA) calar();
+          return;
+        }
+        if (codigo === 'demorou') {
+          falhar(refazer ? OF.FALHOU_REFAZER : OF.DEMOROU, refazer);
+          return;
+        }
+        if (codigo === 'nao_suportado' || codigo === 'inseguro') {
+          falhar(OF.SEM_SUPORTE, refazer, true);
+          return;
+        }
+        falhasDeCriar += 1;
+        const aparelho = bio.aparelho();
+        if (aparelho.iphone && aparelho.instalado && falhasDeCriar >= 2) {
+          falhar(refazer ? OF.ICONE_FALHOU_REFAZER : OF.ICONE_FALHOU, refazer, true);   // dentro do icone da tela inicial, duas falhas seguidas: nao adianta insistir
+          return;
+        }
+        falhar(refazer ? OF.FALHOU_REFAZER : OF.FALHOU, refazer);
+      }
+
+      function aoToqueLigar(ev) {
+        if (aguardando || resolvido) return;   // segundo toque enquanto espera: ignorado
+        const antigo = auth.biometriaDados().id;
+        const pedido = bio.criar({ limiteMs: 60000 });
+        pedido.then((credencial) => aoCriada(credencial, antigo, false, 1), (erro) => aoNaoCriada(erro, false));
+        aguardar(ev);
+      }
+
+      function aoToqueRefazer(ev) {
+        if (aguardando || resolvido) return;
+        const dados = auth.biometriaDados();
+        const antigo = dados.id;
+        const minutos = dados.minutos;   // a trava refeita guarda o mesmo prazo da antiga
+        const pedido = bio.criar({ limiteMs: 60000 });
+        pedido.then((credencial) => aoCriada(credencial, antigo, true, minutos), (erro) => aoNaoCriada(erro, true));
+        aguardar(ev);
+      }
+
+      function aoToqueAgoraNao() {
+        bio.abortar();
+        if (aviso) {
+          try { auth.limparAvisoDaTrava(); } catch { /* o aviso fica e a oferta volta no proximo login completo */ }
+        }
+        terminar({ acao: 'agora_nao' });
+      }
+
+      function aoToqueManter() {
+        bio.abortar();
+        terminar({ acao: 'manteve' });
+      }
+
+      function aoToqueContinuar() {
+        bio.abortar();
+        terminar({ acao: 'sem_suporte' });
+      }
+
+      function aoToqueDesligar() {
+        bio.abortar();
+        const antigo = auth.biometriaDados().id;
+        let desligou = false;
+        try {
+          desligou = auth.desligarBiometria();
+        } catch {
+          desligou = false;
+        }
+        if (!desligou) {
+          dizer(OF.DESLIGAR_FALHOU, true);   // nao diz "desligada" quando o armazenamento nao gravou: a trava continua ligada
+          return;
+        }
+        if (antigo) bio.esquecer(antigo);
+        terminar({ acao: 'desligou' });
+      }
+
+      let textoDaFaixa = null;
+      if (tinha) textoDaFaixa = OF.FAIXA_HAVIA;
+      else if (aviso) textoDaFaixa = textoDaFaixaCaiu(aviso.em);
+      preencher(acoes, ...(tinha
+        ? [
+          botaoDaOferta('manter', OF.MANTER, CLASSES_PRINCIPAL, aoToqueManter),
+          botaoDaOferta('refazer', OF.REFAZER, CLASSES_SECUNDARIO, aoToqueRefazer),
+          botaoDaOferta('desligar', OF.DESLIGAR, CLASSES_DISCRETO, aoToqueDesligar),
+        ]
+        : [
+          botaoDaOferta('ligar', OF.LIGAR, CLASSES_PRINCIPAL, aoToqueLigar),
+          botaoDaOferta('agora-nao', OF.AGORA_NAO, CLASSES_DISCRETO, aoToqueAgoraNao),
+        ]));
+
+      // a oferta usa a cabeca menor da trava, para o botao principal caber na primeira tela; sai de novo quando a oferta resolve
+      const tela = folha.closest('.entrada-tela');
+      if (tela) tela.classList.add('entrada-tela--compacta');
+      const passo = mostrar('',
+        textoDaFaixa
+          ? h('div', { class: 'entrada-aviso entrada-aviso--atencao', role: 'status', 'data-oferta': 'faixa' }, icone('alerta'), h('span', null, textoDaFaixa))
+          : null,
+        h('div', null,
+          h('h2', { class: 'entrada-passo-titulo', tabindex: '-1' }, OF.TITULO),
+          h('p', { class: 'entrada-passo-texto', 'data-oferta': 'lead' }, OF.LEAD)),
+        h('ul', { class: 'oferta-linhas' }, h('li', null, OF.L1), h('li', null, OF.L2), h('li', null, OF.L3)),
+        estado,
+        acoes,
+        h('details', { class: 'entrada-detalhes', 'data-oferta': 'saiba-mais' },
+          h('summary', { class: 'botao botao--discreto botao--cheio' }, OF.SAIBA_MAIS),
+          ...paragrafosDoSaibaMais().map((texto) => h('p', { class: 'passo-texto' }, texto))));
+      passo.classList.add('oferta');
+      passo.setAttribute('data-oferta', tinha ? 'havia' : 'padrao');
+    });
+  }
+
   // Pagina recarregada no meio da entrada (a pessoa foi ao autenticador e voltou): continua de onde parou, sem pedir a senha de novo.
   const retomada = auth.retomarEntrada();
   if (retomada) telaDeCodigo({ cadastro: retomada.passo === 'cadastro' ? retomada.cadastro : null });
-  else telaDeSenha();
+  else telaDeSenha('', { daTrava });
 }

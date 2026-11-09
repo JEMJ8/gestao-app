@@ -22,6 +22,7 @@ import { lista, linhaDePrazo, linhaDePrazoComProblema, numeroDoProcesso } from '
 import { selo, seloConferido, seloCriadoPeloSistema, seloDeSituacao, seloDeStatus, seloNaoConferido } from '../componentes/selo.js';
 import { vazio } from '../componentes/vazio.js';
 import { confirmar } from '../componentes/confirmacao.js';
+import { confirmarSensivel } from '../componentes/confirmacao-verificada.js';
 import { blocoDeComandos } from '../componentes/comando.js';
 import { abrirEdicaoDoPrazo } from '../componentes/edicao-do-prazo.js';
 import { campoDeBusca, grupoDeChips, semDadosAinda } from '../componentes/filtros-de-lista.js';
@@ -447,7 +448,7 @@ function montarDetalhe(ctx) {
     const config = acao.confirmacao(prazo);
     const aguardando = dados.comandosDoAlvo(id).filter((c) => c.estado === 'enviado').length;
     if (aguardando) config.texto = `${config.texto} Já existe um pedido aguardando o computador para este prazo: este vai depois dele.`;
-    const resposta = await confirmar(config);
+    const resposta = await (acao.tipo === 'prazo_excluir' ? confirmarSensivel(config) : confirmar(config));
     if (!resposta.confirmado) return;
     enviando = true;
     erroDeEnvio.hidden = true;

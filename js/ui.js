@@ -28,7 +28,7 @@ function aplicar(el, atributos) {
       el.setAttribute(nome, '');
     } else {
       const texto = String(valor);
-      if (COM_ENDERECO.has(nome) && /^\s*(javascript|vbscript|data):/i.test(texto) && !/^\s*data:image\//i.test(texto)) {
+      if (COM_ENDERECO.has(nome) && /^\s*(javascript|vbscript|data):/i.test(texto) && !/^\s*data:image[/]/i.test(texto)) {
         throw new Error('Endereco nao permitido');
       }
       el.setAttribute(nome, texto);

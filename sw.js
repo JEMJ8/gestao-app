@@ -5,7 +5,7 @@
 // A cada publicacao: mude VERSAO aqui E em js/versao.js (um teste confere que sao iguais) e confira a lista ARQUIVOS
 // (um teste confere que ela tem todos os arquivos da pasta).
 
-const VERSAO = '1.2.0';
+const VERSAO = '1.3.0';
 const PREFIXO = 'gestao-jemj-casca-';
 const CACHE = `${PREFIXO}${VERSAO}`;
 
@@ -20,6 +20,7 @@ const ARQUIVOS = [
   'css/componentes.css',
   'css/telas.css',
   'css/tela-entrada.css',
+  'css/trava.css',
   'css/tela-prazos.css',
   'css/tela-publicacoes.css',
   'css/tela-mais.css',
@@ -37,6 +38,7 @@ const ARQUIVOS = [
   'js/app.js',
   'js/api.js',
   'js/auth.js',
+  'js/biometria.js',
   'js/casca.js',
   'js/dados.js',
   'js/datas.js',
@@ -56,6 +58,7 @@ const ARQUIVOS = [
   'js/componentes/comando.js',
   'js/componentes/contato.js',
   'js/componentes/confirmacao.js',
+  'js/componentes/confirmacao-verificada.js',
   'js/componentes/consultas-lista.js',
   'js/componentes/edicao-do-prazo.js',
   'js/componentes/filtros-de-lista.js',
@@ -83,6 +86,7 @@ const ARQUIVOS = [
   'js/telas/prazos.js',
   'js/telas/processos.js',
   'js/telas/publicacoes.js',
+  'js/telas/trava.js',
 ];
 
 const BASE = new URL(self.registration.scope);

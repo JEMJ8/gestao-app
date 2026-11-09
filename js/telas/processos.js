@@ -134,7 +134,7 @@ function par(rotulo, valor) {
 let listaLembrada = null;
 
 function lembrarAoSair(termo) {
-  listaLembrada = /^#\/(processo|prazo|cliente|publicacao|evento)\//.test(window.location.hash) ? { termo, y: window.scrollY, em: performance.now() } : null;
+  listaLembrada = /^#[/](processo|prazo|cliente|publicacao|evento)[/]/.test(window.location.hash) ? { termo, y: window.scrollY, em: performance.now() } : null;
 }
 
 function recuperarLista() {

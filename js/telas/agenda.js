@@ -190,7 +190,7 @@ let lembrada = null;
 
 function lembrarAoSair(tela) {
   // so lembra quando a pessoa foi ver o detalhe de algo; ao tocar de novo na aba Agenda, a lista comeca limpa
-  lembrada = /^#\/(prazo|evento|processo|publicacao|cliente)\//.test(window.location.hash)
+  lembrada = /^#[/](prazo|evento|processo|publicacao|cliente)[/]/.test(window.location.hash)
     ? { diasAntes: tela.diasAntes, diasDepois: tela.diasDepois, y: window.scrollY, em: performance.now(), dia: hojeEmCuiaba() }
     : null;
 }
