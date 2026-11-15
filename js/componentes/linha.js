@@ -12,6 +12,7 @@ import { icone } from '../icones.js';
 import * as dados from '../dados.js';
 import { dataComDia, dataComDiaCurta, dataCurta, dataDoMomento, faixaDeHorario, rotuloDoDia, textoDeDias } from '../datas.js';
 import { processoCNJ } from '../formato.js';
+import { nomeDoEstado, siglaDoEstado } from '../estados.js';
 import { criadoAutomaticamente, prazoAberto, prazoNaoConferido, ROTULO_EVENTO, ROTULO_PUBLICACAO, situacaoDoPrazo } from '../dominio.js';
 import { seloCriadoPeloSistema, seloDeSituacao, seloDeStatus, seloNaoConferido, selo } from './selo.js';
 
@@ -25,6 +26,17 @@ export function lista(linhas, { solta = false } = {}) {
 /** O numero do processo sem quebrar no meio (um numero cortado em duas linhas nao se le). */
 export function numeroDoProcesso(numero) {
   return h('span', { class: 'nowrap' }, processoCNJ(numero));
+}
+
+/**
+ * A etiqueta do estado do processo ("MT") que fica junto do numero na linha do prazo. `uf` e a coluna `uf` do processo. Nome acessivel e dica dizem o
+ * estado por extenso ("Estado: Mato Grosso"). Sem UF, ou com duas letras que nao sao de estado, devolve null e nada aparece. So mostra.
+ */
+export function etiquetaDoEstado(uf) {
+  const sigla = siglaDoEstado(uf);
+  if (!sigla) return null;
+  const nome = nomeDoEstado(sigla);
+  return h('span', { class: 'etiqueta-uf', role: 'img', 'aria-label': `Estado: ${nome}`, title: nome }, sigla);
 }
 
 /**
@@ -80,12 +92,15 @@ export function linhaDePrazo(prazo, { hoje, mostrarCliente = true, href = `#/pra
   const processo = dados.linha('processo', prazo.processo_id);
   const cliente = mostrarCliente ? dados.nomeDoClienteDoProcesso(prazo.processo_id) : '';
   const aberto = prazoAberto(prazo);
+  // o link da linha tem nome acessivel proprio (`rotulo`), que substitui o conteudo: sem o estado aqui, o leitor de tela nunca o diria (a etiqueta dentro do link nao conta)
+  const siglaDoProcesso = processo ? siglaDoEstado(processo.uf) : null;
+  const estado = siglaDoProcesso ? nomeDoEstado(siglaDoProcesso) : '';
   return linhaDeLista({
     href,
     titulo: prazo.ato,
     quando: [h('strong', null, dataComDiaCurta(prazo.data_fatal, hoje)), aberto ? ` · ${textoDeDias(situacao.dias)}` : null],
     subtitulo: cliente || null,
-    subtitulo2: processo ? numeroDoProcesso(processo.numero) : null,
+    subtitulo2: processo ? [etiquetaDoEstado(processo.uf), numeroDoProcesso(processo.numero)] : null,
     variante: aberto ? VARIANTE_DA_SITUACAO[situacao.chave] || null : null,
     selos: [
       prazoNaoConferido(prazo) ? seloNaoConferido() : null,
@@ -93,7 +108,7 @@ export function linhaDePrazo(prazo, { hoje, mostrarCliente = true, href = `#/pra
       aberto ? seloDeSituacao(situacao) : null,
       seloDeStatus(prazo.status),
     ],
-    rotulo: `${prazo.ato}, ${cliente ? `${cliente}, ` : ''}data fatal ${dataComDia(prazo.data_fatal)}${prazoNaoConferido(prazo) ? ', prazo não conferido' : ''}`,
+    rotulo: `${prazo.ato}, ${cliente ? `${cliente}, ` : ''}data fatal ${dataComDia(prazo.data_fatal)}${estado ? `, estado ${estado}` : ''}${prazoNaoConferido(prazo) ? ', prazo não conferido' : ''}`,
   });
 }
 

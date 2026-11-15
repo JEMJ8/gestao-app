@@ -114,6 +114,23 @@
 .selo--info { background: var(--info-fundo); border-color: var(--info); color: var(--info); }
 .selo--forte { border-width: 2px; padding: 3px 10px; }
 .selos { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e2); }
+/* etiqueta do estado do processo ("MT") junto do numero, na linha do prazo: o mesmo par de cores do selo comum, com o canto menos redondo para nao
+   parecer um selo de situacao. 14 px como todo texto do aplicativo; nao e toque nem link, so informa (a dica traz o nome do estado). */
+.etiqueta-uf {
+  display: inline-block;
+  margin-right: var(--e1);
+  padding: 0 6px;
+  background: var(--superficie-2);
+  border: 1px solid var(--linha);
+  border-radius: 6px;
+  color: var(--texto-2);
+  font-size: var(--t-pequeno);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
 
 /* ---------------------------------------------------------------- lista e linha */
 .lista { display: flex; flex-direction: column; }
