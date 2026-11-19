@@ -89,7 +89,7 @@ function textoDeBusca(c) {
 }
 
 const VAZIO_POR_FILTRO = {
-  novas: { icone: 'ok', titulo: 'Nenhuma publicação nova', texto: 'Todas as publicações recentes já foram lidas no computador.', variante: 'ok' },
+  novas: { icone: 'ok', titulo: 'Nenhuma publicação a conferir', texto: 'Todas as publicações recentes já foram lidas no computador.', variante: 'ok' },
   com_prazo: { icone: 'info', titulo: 'Nenhuma publicação com prazo', texto: 'Nos últimos 180 dias nenhuma publicação gerou prazo.' },
   sem_prazo: { icone: 'info', titulo: 'Nenhuma publicação sem prazo', texto: 'Nos últimos 180 dias nenhuma publicação foi marcada como sem prazo.' },
   todas: { icone: 'info', titulo: 'Nenhuma publicação', texto: 'Quando o computador enviar publicações dos últimos 180 dias, elas aparecem aqui.' },

@@ -1,4 +1,4 @@
-// Financeiro (SOMENTE LEITURA): resumo do mes em reais e a lista de parcelas por vencimento, com tres filtros: A vencer, Em atraso e Recebidas.
+// Financeiro (SOMENTE LEITURA): resumo do mes em reais e a lista de parcelas por vencimento, com tres filtros: A receber, Atrasadas e Recebidas.
 // O celular nao registra recebimento: isso e feito no computador. Cada linha mostra o cliente, o contrato (objeto), o numero da parcela (2/10),
 // o valor, o vencimento e a situacao; tocar abre o cliente.
 //
@@ -18,13 +18,13 @@ import { avisoDeCarga } from '../componentes/carga.js';
 import { FILTROS_DE_PARCELA, blocoDeValores, linhaDeParcela, repartirParcelas, resumoDoMes, somaDoFiltro } from '../componentes/parcela.js';
 
 const PARCELAS_POR_PAGINA = 40;
-const ROTULO_DO_FILTRO = { a_vencer: 'A vencer', atrasadas: 'Em atraso', recebidas: 'Recebidas' };
+const ROTULO_DO_FILTRO = { a_vencer: 'A receber', atrasadas: 'Atrasadas', recebidas: 'Recebidas' };
 const VAZIO_DO_FILTRO = {
-  a_vencer: { icone: 'ok', titulo: 'Nenhuma parcela a vencer', texto: 'Não há parcela aberta com vencimento de hoje em diante.' },
-  atrasadas: { icone: 'ok', titulo: 'Nenhuma parcela em atraso', texto: 'Todas as parcelas vencidas já foram recebidas.', variante: 'ok' },
+  a_vencer: { icone: 'ok', titulo: 'Nenhuma parcela a receber', texto: 'Não há parcela aberta com vencimento de hoje em diante.' },
+  atrasadas: { icone: 'ok', titulo: 'Nenhuma parcela atrasada', texto: 'Todas as parcelas vencidas já foram recebidas.', variante: 'ok' },
   recebidas: { icone: 'info', titulo: 'Nenhuma parcela recebida', texto: 'Quando o computador registrar recebimentos, eles aparecem aqui.' },
 };
-const FRASE_DO_TOTAL = { a_vencer: 'A receber nesta lista', atrasadas: 'Em atraso nesta lista', recebidas: 'Recebido nesta lista' };
+const FRASE_DO_TOTAL = { a_vencer: 'A receber nesta lista', atrasadas: 'Atrasado nesta lista', recebidas: 'Recebido nesta lista' };
 
 function maiuscula(texto) {
   return texto ? texto[0].toUpperCase() + texto.slice(1) : texto;
@@ -45,7 +45,7 @@ function cartaoDoMes(hoje, contratos) {
     blocoDeValores([
       { rotulo: `A receber em ${nomeDoMes}`, centavos: r.aReceber, variante: 'info', icone: 'relogio', ajuda: `${plural(r.aReceberQtd, 'parcela aberta', 'parcelas abertas')} com vencimento neste mês` },
       { rotulo: `Recebido em ${nomeDoMes}`, centavos: r.recebido, variante: 'ok', icone: 'ok', ajuda: `${plural(r.recebidoQtd, 'parcela recebida', 'parcelas recebidas')} neste mês` },
-      { rotulo: 'Em atraso', centavos: r.emAtraso, variante: r.emAtraso > 0 ? 'perigo' : null, icone: 'alerta', ajuda: `${plural(r.emAtrasoQtd, 'parcela vencida e não recebida', 'parcelas vencidas e não recebidas')}, de todos os meses` },
+      { rotulo: 'Atrasado', centavos: r.emAtraso, variante: r.emAtraso > 0 ? 'perigo' : null, icone: 'alerta', ajuda: `${plural(r.emAtrasoQtd, 'parcela vencida e não recebida', 'parcelas vencidas e não recebidas')}, de todos os meses` },
     ]),
     r.recebidasSemData
       ? h('p', { class: 'fin-nota texto-2 texto-pequeno' }, `${plural(r.recebidasSemData, 'parcela recebida não tem', 'parcelas recebidas não têm')} data de recebimento registrada e ${r.recebidasSemData === 1 ? 'fica' : 'ficam'} fora do recebido do mês.`)

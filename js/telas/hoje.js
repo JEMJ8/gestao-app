@@ -1,6 +1,6 @@
 // Tela Hoje: o que exige atencao agora.
 // Ordem (pensada para o celular): saudacao, semaforo (vencidos, hoje, proximos 7 dias), o aviso PRAZO NAO CONFERIDO (sempre visivel),
-// os prazos que pedem acao, as audiencias de hoje e amanha, as publicacoes novas e os proximos prazos.
+// os prazos que pedem acao, as audiencias de hoje e amanha, as publicacoes a conferir e os proximos prazos.
 //
 // Esta e a tela-modelo do aplicativo: mostra como ler dados de js/dados.js, usar os componentes e reagir a mudancas.
 
@@ -107,12 +107,12 @@ function desenhar(raiz, hoje) {
       ? cartao({ corpo: 'lista', rotulo: 'Audiências de hoje e amanhã' }, lista(audiencias.map((e) => linhaDeEvento(e, { hoje }))))
       : h('p', { class: 'texto-2 hoje-nada' }, 'Nenhuma audiência hoje nem amanhã.'),
 
-    secao('Publicações novas', 'Ver todas', href('/publicacoes')),
+    secao('Publicações a conferir', 'Ver todas', href('/publicacoes')),
     novas.length
-      ? cartao({ corpo: 'lista', rotulo: 'Publicações novas' },
-        h('p', { class: 'hoje-contagem' }, icone('jornal', { tamanho: 18 }), plural(novas.length, 'publicação nova esperando leitura', 'publicações novas esperando leitura')),
+      ? cartao({ corpo: 'lista', rotulo: 'Publicações a conferir' },
+        h('p', { class: 'hoje-contagem' }, icone('jornal', { tamanho: 18 }), plural(novas.length, 'publicação a conferir', 'publicações a conferir')),
         lista(novas.slice(0, LINHAS_DE_PUBLICACOES).map((c) => linhaDePublicacao(c))))
-      : h('p', { class: 'texto-2 hoje-nada' }, 'Nenhuma publicação nova.'),
+      : h('p', { class: 'texto-2 hoje-nada' }, 'Nenhuma publicação a conferir.'),
 
     grupos.proximos.length
       ? [

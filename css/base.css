@@ -110,7 +110,7 @@ main:focus { outline: none; }
 }
 .topo-botao:hover { background: var(--superficie-2); }
 .topo-botao.girando svg { animation: girar 0.9s linear infinite; }
-.topo-botao[disabled] { opacity: 0.6; cursor: default; }
+.topo-botao[disabled], .topo-botao[aria-disabled="true"] { opacity: 0.6; cursor: default; }
 
 .faixas {
   position: sticky;

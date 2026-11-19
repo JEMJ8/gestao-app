@@ -302,7 +302,8 @@ async function rotear() {
   }
   registro.retorno = retorno;
   casca.aoTrocar(info);
-  raiz.focus({ preventScroll: true });
+  // O foco vai para o inicio da tela nova, salvo se a propria tela ja o pos em algo dela (a busca do Mais aberta pela lupa do topo).
+  if (!raiz.contains(document.activeElement)) raiz.focus({ preventScroll: true });
 }
 
 /** Refaz a tela atual do zero (a mesma rota). */

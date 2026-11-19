@@ -1,4 +1,4 @@
-// A casca do aplicativo: topo (voltar, titulo, atualizar), faixas de sincronizacao e barra de baixo (Hoje, Prazos, Agenda, Publicações, Mais).
+// A casca do aplicativo: topo (voltar, titulo, buscar, atualizar), faixas de sincronizacao e barra de baixo (Hoje, Prazos, Agenda, Publicações, Mais).
 // As telas nao mexem aqui: usam ctx.titulo() e o registro de rota (aba, pai). A casca entrega ao roteador os ganchos de que ele precisa.
 
 import { h, preencher, anunciar } from './ui.js';
@@ -33,11 +33,34 @@ export function montarCasca() {
   const titulo = document.getElementById('titulo');
   const botaoVoltar = document.getElementById('voltar');
   const botaoAtualizar = document.getElementById('atualizar');
+  const botaoBuscar = document.getElementById('buscar');
+
+  function focarBuscaDoMais() {
+    const campo = conteudo.querySelector('.campo-de-busca-entrada');
+    if (!campo) return;
+    window.scrollTo(0, 0);
+    campo.focus({ preventScroll: true });
+  }
 
   preencher(botaoVoltar, icone('voltar', { tamanho: 24 }));
   preencher(botaoAtualizar, icone('atualizar', { tamanho: 22 }));
+  preencher(botaoBuscar, icone('busca', { tamanho: 22 }));
   botaoVoltar.addEventListener('click', () => rotas.voltar());
-  botaoAtualizar.addEventListener('click', () => { dados.atualizar(); });
+  // A lupa leva a busca geral, que mora na tela Mais (nenhuma rota nova): de outra tela, abre Mais ja com o foco no campo; em Mais, so poe o foco.
+  botaoBuscar.addEventListener('click', () => {
+    const rota = rotas.rotaAtual();
+    if (rota && rota.padrao === '/mais') {
+      focarBuscaDoMais();
+      return;
+    }
+    rotas.ir('/mais', {}, { buscar: '1' });
+  });
+  // Enquanto atualiza o botao NAO fica `disabled` (o navegador tira o foco de botao desativado e a pessoa cai no inicio da pagina):
+  // fica aria-disabled com aria-busy, e o clique repetido para aqui.
+  botaoAtualizar.addEventListener('click', () => {
+    if (botaoAtualizar.getAttribute('aria-busy') === 'true') return;
+    dados.atualizar();
+  });
 
   const itens = new Map();
   for (const aba of ABAS) {
@@ -60,7 +83,13 @@ export function montarCasca() {
     preencher(faixas, lista);
     faixas.hidden = lista.length === 0;
     botaoAtualizar.classList.toggle('girando', estado.atualizando);
-    botaoAtualizar.disabled = estado.atualizando;
+    if (estado.atualizando) {
+      botaoAtualizar.setAttribute('aria-busy', 'true');
+      botaoAtualizar.setAttribute('aria-disabled', 'true');
+    } else {
+      botaoAtualizar.removeAttribute('aria-busy');
+      botaoAtualizar.removeAttribute('aria-disabled');
+    }
     botaoAtualizar.setAttribute('aria-label', estado.atualizando ? 'Atualizando…' : 'Atualizar agora');
   }
 
@@ -76,7 +105,7 @@ export function montarCasca() {
     const urgentes = contarPrazosUrgentes();
     definirContador('prazos', urgentes, `${urgentes} ${urgentes === 1 ? 'prazo vencido ou para hoje' : 'prazos vencidos ou para hoje'}`);
     const novas = dados.obter('comunicacao').filter(publicacaoNova).length;
-    definirContador('publicacoes', novas, `${novas} ${novas === 1 ? 'nova' : 'novas'}`, 'info');
+    definirContador('publicacoes', novas, `${novas} a conferir`, 'info');
   }
 
   let anunciouAtualizacao = false;

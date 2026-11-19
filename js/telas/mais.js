@@ -3,7 +3,7 @@
 //
 // A busca fica no alto. Sem nada digitado aparece o menu; digitando, aparecem os resultados agrupados e cada toque abre o destino certo
 // (cliente, processo ou prazo). O que foi digitado volta quando a pessoa aperta Voltar de dentro de um resultado (ver componentes/filtros.js).
-// Nenhuma rota nova: a busca vive dentro de /mais.
+// Nenhuma rota nova: a busca vive dentro de /mais. A lupa do topo (js/casca.js) abre esta tela com ?buscar=1, e o campo ja nasce com o foco.
 
 import { registrar, href } from '../rotas.js';
 import * as dados from '../dados.js';
@@ -32,7 +32,7 @@ function itemDoFinanceiro(hoje) {
     href: href('/financeiro', {}, { filtro: 'atrasadas' }),
     icone: 'dinheiro',
     titulo: 'Financeiro',
-    subtitulo: `${plural(atrasadas.length, 'parcela em atraso', 'parcelas em atraso')} (${dinheiro(somaDoFiltro(atrasadas, 'atrasadas'))})`,
+    subtitulo: `${plural(atrasadas.length, 'parcela atrasada', 'parcelas atrasadas')} (${dinheiro(somaDoFiltro(atrasadas, 'atrasadas'))})`,
     variante: 'perigo',
   });
 }
@@ -180,6 +180,13 @@ registrar('/mais', (ctx) => {
   preencher(ctx.raiz, campo.el, area, sincronia);
   desenharArea();
   desenharSincronia();
+
+  // Chegou pela lupa do topo (#/mais?buscar=1): o campo ja recebe o foco, uma vez. Quem volta de um resultado para esta mesma entrada do
+  // historico encontra a busca como deixou, sem o teclado abrir de novo por cima dos resultados.
+  if (ctx.consulta.buscar === '1' && !lembrado('mais.focou', false)) {
+    lembrar('mais.focou', true);
+    campo.input.focus({ preventScroll: true });
+  }
 
   ctx.aoMudarDados(() => {
     const estado = dados.estado();

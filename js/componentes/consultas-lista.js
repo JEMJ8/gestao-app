@@ -123,7 +123,7 @@ export function achaNaBusca(texto, busca) {
 // ---------------------------------------------------------------- publicacoes
 
 export const FILTROS_DE_PUBLICACAO = [
-  { valor: 'novas', rotulo: 'Novas', contar: true, tom: 'info' },
+  { valor: 'novas', rotulo: 'A conferir', contar: true, tom: 'info' },
   { valor: 'com_prazo', rotulo: 'Com prazo', contar: true },
   { valor: 'sem_prazo', rotulo: 'Sem prazo', contar: true },
   { valor: 'todas', rotulo: 'Todas', contar: true },

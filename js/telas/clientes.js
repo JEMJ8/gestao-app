@@ -205,8 +205,8 @@ function cartaoDoContrato(contrato, pessoa, hoje, expandido, aoExpandir) {
         ? h('p', { class: 'texto-2' }, 'Contrato cancelado: as parcelas abertas não são mais cobradas.')
         : blocoDeValores([
           { rotulo: 'Recebido', centavos: soma.recebido, variante: 'ok', icone: 'ok' },
-          { rotulo: 'A vencer', centavos: soma.aVencer, variante: 'info', icone: 'relogio' },
-          { rotulo: 'Em atraso', centavos: soma.emAtraso, variante: soma.emAtraso > 0 ? 'perigo' : null, icone: 'alerta' },
+          { rotulo: 'A receber', centavos: soma.aVencer, variante: 'info', icone: 'relogio' },
+          { rotulo: 'Atrasado', centavos: soma.emAtraso, variante: soma.emAtraso > 0 ? 'perigo' : null, icone: 'alerta' },
         ])),
     parcelas.length
       ? lista(mostradas.map((p) => linhaDeParcela(p, { hoje, contrato, pessoa, mostrarCliente: false })))

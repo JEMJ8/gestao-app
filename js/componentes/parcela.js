@@ -6,7 +6,7 @@
 // Valores reais (migrations/0003_financeiro.sql):
 //   contrato.situacao: ativo | quitado | cancelado          contrato.modalidade: fixo | parcelado | exito | misto
 //   parcela.situacao:  aberta | recebida | cancelada         parcela.numero 0 = entrada; 1..total = parcelas
-// "Em atraso" = parcela ABERTA com vencimento antes de hoje (hoje de Cuiaba). Parcela aberta de contrato CANCELADO nao e cobranca
+// "Atrasada" = parcela ABERTA com vencimento antes de hoje (hoje de Cuiaba). Parcela aberta de contrato CANCELADO nao e cobranca
 // (o computador as cancela junto; se uma sobrar, ela nao entra nas contas nem na lista de cobranca).
 // O resumo do mes segue as mesmas regras de app/api/financeiro.py (resumo_financeiro): a receber = abertas com vencimento no mes;
 // recebido = recebidas com data de recebimento no mes (valor recebido, ou o da parcela se nao houver); em atraso = todas as vencidas.
@@ -177,7 +177,7 @@ export function blocoDeValores(linhas) {
 
 function seloDaParcela(chave) {
   switch (chave) {
-    case 'atrasada': return selo('perigo', 'Em atraso', { icone: 'alerta', forte: true });
+    case 'atrasada': return selo('perigo', 'Atrasada', { icone: 'alerta', forte: true });
     case 'vence_hoje': return selo('atencao', 'Vence hoje', { icone: 'relogio', forte: true });
     case 'a_vencer': return selo('info', 'A vencer', { icone: 'relogio' });
     case 'sem_data': return selo('neutro', 'Sem data de vencimento');
@@ -189,7 +189,7 @@ function seloDaParcela(chave) {
 }
 
 const VARIANTE_DA_PARCELA = { atrasada: 'perigo', vence_hoje: 'atencao' };
-const FRASE_DA_SITUACAO = { atrasada: 'em atraso', vence_hoje: 'vence hoje', a_vencer: 'a vencer', sem_data: 'sem data de vencimento', recebida: 'recebida', cancelada: 'cancelada', contrato_cancelado: 'contrato cancelado' };
+const FRASE_DA_SITUACAO = { atrasada: 'atrasada', vence_hoje: 'vence hoje', a_vencer: 'a vencer', sem_data: 'sem data de vencimento', recebida: 'recebida', cancelada: 'cancelada', contrato_cancelado: 'contrato cancelado' };
 
 function quandoDaParcela(parcela, situacao, hoje) {
   const vencimento = diaDe(parcela.vencimento);
